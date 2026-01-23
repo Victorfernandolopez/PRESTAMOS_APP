@@ -8,7 +8,8 @@ from sqlalchemy import (
     ForeignKey
 )
 from sqlalchemy.orm import relationship
-from .database import Base
+from backend.database import Base
+
 
 """
 Este archivo define los MODELOS de la base de datos.

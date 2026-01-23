@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
 from typing import Optional, List
 
@@ -12,9 +12,6 @@ No es la BD, es la capa de validación / serialización.
 # =========================
 
 class ClienteBase(BaseModel):
-    """
-    Campos comunes del cliente.
-    """
     nombre_completo: str
     dni: str
     direccion: str
@@ -25,9 +22,6 @@ class ClienteBase(BaseModel):
 
 
 class ClienteCreate(ClienteBase):
-    """
-    Usado para crear clientes.
-    """
     pass
 
 
@@ -36,17 +30,11 @@ class ClienteCreate(ClienteBase):
 # =========================
 
 class ClienteArchivoBase(BaseModel):
-    """
-    Datos base de un archivo.
-    """
-    tipo: str   # dni_frente, dni_dorso, selfie_dni, comprobante
+    tipo: str
     url: str
 
 
 class ClienteArchivoOut(ClienteArchivoBase):
-    """
-    Archivo devuelto por la API.
-    """
     id: int
     cliente_id: int
 
@@ -55,17 +43,12 @@ class ClienteArchivoOut(ClienteArchivoBase):
 
 
 # =========================
-# CLIENTE (OUTPUT COMPLETO)
+# CLIENTE (OUTPUT)
 # =========================
 
 class ClienteOut(ClienteBase):
-    """
-    Cliente devuelto por la API.
-    Incluye SOLO archivos.
-    NO incluye préstamos (evita ciclos).
-    """
     id: int
-    archivos: List[ClienteArchivoOut] = []
+    archivos: List[ClienteArchivoOut] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -76,9 +59,6 @@ class ClienteOut(ClienteBase):
 # =========================
 
 class PrestamoBase(BaseModel):
-    """
-    Datos base del préstamo.
-    """
     cliente_id: int
     monto_prestado: float
     total_a_pagar: float
@@ -87,21 +67,13 @@ class PrestamoBase(BaseModel):
 
 
 class PrestamoCreate(PrestamoBase):
-    """
-    Usado para crear préstamos.
-    """
     pass
 
 
 class PrestamoOut(PrestamoBase):
-    """
-    Préstamo devuelto por la API.
-    Incluye cliente completo.
-    """
     id: int
     fecha_pago: Optional[date] = None
     monto_cobrado_final: Optional[float] = None
-
     cliente: ClienteOut
 
     class Config:

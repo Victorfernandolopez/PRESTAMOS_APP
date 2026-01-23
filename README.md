@@ -1,110 +1,206 @@
-# 📌 Sistema de Préstamos Privados
+PrestamosManager Pro
 
-Aplicación **fullstack** para la gestión de préstamos privados, clientes, archivos asociados, inversores y control de cobros.  
-Pensada para uso local (desktop / Electron) con backend en FastAPI y frontend en React.
+PrestamosManager Pro es una aplicación desktop (Windows) para la gestión integral de préstamos privados, desarrollada con:
 
----
+Backend: FastAPI + SQLite
 
-## 🧩 Funcionalidades
+Frontend: React + Vite
 
-### 👤 Clientes
-- Alta y listado de clientes
-- Datos de contacto y observaciones
-- Carga de archivos por cliente (DNI, selfies, comprobantes)
-- Visualización de archivos asociados
+Desktop: Electron
 
-### 💸 Préstamos
-- Creación de préstamos por cliente
-- Cálculo automático de intereses
-- Control de vencimientos
-- Detección de morosos
-- Cobro total o parcial
-- Agregar monto a préstamos existentes
+Empaquetado: Electron Builder (NSIS)
 
-### 📈 Inversores
-- Alta de inversores
-- Cálculo de ganancias por tasa diaria
-- Liquidación de inversiones
+Pensada para uso local, sin dependencias externas ni servicios en la nube.
 
-### 🛡️ Seguridad de datos
-- Base de datos SQLite
-- Backups automáticos de la base de datos ante cambios críticos
+Funcionalidades
+Clientes
 
----
+Alta, listado y detalle de clientes
 
-## 🏗️ Arquitectura
+Datos personales y observaciones
 
+Carga y visualización de archivos:
+
+DNI frente / dorso
+
+Selfie con DNI
+
+Comprobantes
+
+Préstamos
+
+Creación de préstamos asociados a clientes
+
+Control de vencimientos
+
+Estados de pago
+
+Agregar monto a préstamos existentes
+
+Cobro de préstamos
+
+Inversores
+
+Alta de inversores
+
+Registro de capital invertido
+
+Liquidación de inversiones
+
+Persistencia y datos
+
+Base de datos SQLite local
+
+La base se crea automáticamente en la primera ejecución
+
+Los datos persisten entre ejecuciones
+
+El backend se ejecuta en segundo plano junto a la app
+
+Arquitectura del proyecto
 prestamos_app/
 │
-├── backend/
-│ ├── main.py # API FastAPI
-│ ├── database.py # DB + backups
-│ ├── models.py # Modelos SQLAlchemy
-│ ├── schemas.py # Schemas Pydantic
-│ ├── crud.py # Lógica de negocio
-│ └── prestamos.db # Base de datos SQLite
+├── backend/                # Código fuente backend (FastAPI)
+│   ├── main.py
+│   ├── database.py
+│   ├── models.py
+│   ├── schemas.py
+│   └── crud.py
 │
-├── components/ # Componentes React
-├── services/ # Servicios API frontend
-├── uploads/ # Archivos de clientes
-├── backups/ # Backups automáticos
+├── backend_dist/            # Backend compilado (PyInstaller)
+│   └── backend.exe
 │
-├── App.tsx
-├── types.ts
+├── electron/                # Proceso principal Electron
+│   └── main.js
+│
+├── components/              # Componentes React
+├── services/                # Servicios frontend (API)
+│
+├── dist/                    # Build frontend (Vite)
+│
 ├── package.json
-├── requirements.txt
-└── README.md
+├── vite.config.ts
+├── tsconfig.json
+├── README.md
+└── .gitignore
 
+Requisitos de desarrollo
 
----
+Node.js 18+
 
-## ⚙️ Requisitos
+Python 3.10+
 
-- Python **3.10+**
-- Node.js **18+**
-- Git
+Git
 
----
+Windows (objetivo de empaquetado)
 
-## 🐍 Backend – Instalación
-
-```bash
+Backend – Desarrollo
 # Crear entorno virtual
 python -m venv venv
 
 # Activar entorno
-source venv/Scripts/activate   # Windows Git Bash
-# source venv/bin/activate     # Linux / Mac
+source venv/Scripts/activate   # Windows (Git Bash)
 
 # Instalar dependencias
 pip install -r requirements.txt
 
-Ejecutar backend
-python -m uvicorn backend.main:app --reload
+# Ejecutar backend
+python backend/main.py
+
 
 API disponible en:
-http://127.0.0.1:8000
 
-Frontend – Instalación
+http://127.0.0.1:8000
+http://127.0.0.1:8000/docs
+
+Frontend – Desarrollo
 npm install
 npm run dev
 
-Backups
 
-Los backups se generan automáticamente cuando hay cambios en la base de datos.
+Frontend disponible en:
+
+http://localhost:3000
+
+Desktop (Electron) – Desarrollo
+
+Con backend ya compilado en backend_dist/backend.exe:
+
+npm run electron
+
+
+Esto:
+
+abre la ventana Electron
+
+levanta automáticamente el backend
+
+cierra el backend al cerrar la app
+
+Empaquetado para Windows (Producción)
+Compilar backend (una sola vez)
+
+Desde la raíz del proyecto:
+
+pyinstaller --onefile backend/main.py --name backend
+
+
+Mover el ejecutable a:
+
+backend_dist/backend.exe
+
+2️Build + instalador Windows
+npm run dist
+
+
+Se genera:
+
+dist/PrestamosManager Pro Setup 1.0.0.exe
+
+Control de versiones (Git)
+
+Este repositorio NO incluye:
+
+node_modules/
+
+dist/
+
+backend_dist/
+
+bases de datos .db
+
+archivos de usuarios
+
+ejecutables .exe
+
+Todo eso se genera localmente.
 
 Estado del proyecto
 
-✅ Versión v1 estable
-Funcional
-Sin errores críticos
-Lista para uso real
-Base sólida para nuevas features
+Versión estable v1.0.0
 
+App desktop funcional
 
-Próximas mejoras (planificadas)
-Notificaciones por WhatsApp
-Alertas de vencimiento
+Backend embebido
+
+Persistencia local
+
+Flujo completo probado
+
+Lista para uso real en Windows
+
+Próximas mejoras (opcional)
+
+Autenticación y roles
+
 Reportes exportables
-Autenticación
-Roles de usuario
+
+Alertas de vencimientos
+
+Notificaciones
+
+Instalador firmado
+
+Autor
+
+Proyecto desarrollado como aplicación fullstack desktop, integrando backend Python y frontend moderno, con enfoque en arquitectura clara, persistencia local y empaquetado profesional.

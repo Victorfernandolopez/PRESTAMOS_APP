@@ -1,21 +1,15 @@
 import React, { useState } from 'react';
 
 /* =============================
-   TIPOS LOCALES
+   TIPOS
 ============================= */
 
-/**
- * Archivo asociado a un cliente
- */
 interface ClienteArchivo {
   id: number;
-  tipo: string; // dni_frente, dni_dorso, etc.
-  url: string;  // ruta devuelta por backend
+  tipo: string;
+  url: string;
 }
 
-/**
- * Cliente con posible relación a archivos
- */
 interface Cliente {
   id: number;
   nombre_completo: string;
@@ -28,14 +22,10 @@ interface Cliente {
   archivos?: ClienteArchivo[];
 }
 
-/**
- * Props recibidas desde App.tsx
- * 👉 App es el dueño del estado global de clientes
- */
 interface ClientModuleProps {
   clientes: Cliente[];
-  onClienteCreado: () => void;   // refresca clientes en App
-  onClienteChange: () => void;   // refresca cuando cambia algo del cliente
+  onClienteCreado: () => void;
+  onClienteChange: () => void;
 }
 
 /* =============================
@@ -47,14 +37,9 @@ const ClientModule: React.FC<ClientModuleProps> = ({
   onClienteCreado,
   onClienteChange
 }) => {
-
-  // Cliente seleccionado para ver detalle
   const [clienteActivo, setClienteActivo] = useState<Cliente | null>(null);
-
-  // Modal de creación
   const [showForm, setShowForm] = useState(false);
 
-  // Formulario nuevo cliente
   const [form, setForm] = useState({
     nombre_completo: '',
     dni: '',
@@ -65,7 +50,6 @@ const ClientModule: React.FC<ClientModuleProps> = ({
     observaciones: ''
   });
 
-  // Subida de archivos
   const [archivo, setArchivo] = useState<File | null>(null);
   const [tipoArchivo, setTipoArchivo] = useState('');
 
@@ -82,7 +66,6 @@ const ClientModule: React.FC<ClientModuleProps> = ({
       body: JSON.stringify(form)
     });
 
-    // Reset UI
     setShowForm(false);
     setForm({
       nombre_completo: '',
@@ -94,12 +77,11 @@ const ClientModule: React.FC<ClientModuleProps> = ({
       observaciones: ''
     });
 
-    // 🔴 CLAVE: refresca clientes en App.tsx
     onClienteCreado();
   };
 
   /* =============================
-     SUBIR ARCHIVO A CLIENTE
+     SUBIR ARCHIVO
   ============================== */
 
   const subirArchivo = async () => {
@@ -110,23 +92,17 @@ const ClientModule: React.FC<ClientModuleProps> = ({
 
     await fetch(
       `http://127.0.0.1:8000/clientes/${clienteActivo.id}/archivos?tipo=${tipoArchivo}`,
-      {
-        method: 'POST',
-        body: formData
-      }
+      { method: 'POST', body: formData }
     );
 
-    // Volver a pedir el cliente para refrescar archivos
     const res = await fetch(
       `http://127.0.0.1:8000/clientes/${clienteActivo.id}`
     );
     const data = await res.json();
-    setClienteActivo(data);
 
+    setClienteActivo(data);
     setArchivo(null);
     setTipoArchivo('');
-
-    // Avisar a App para que refresque referencias cruzadas
     onClienteChange();
   };
 
@@ -148,7 +124,7 @@ const ClientModule: React.FC<ClientModuleProps> = ({
         </button>
       </div>
 
-      {/* LISTADO CLIENTES */}
+      {/* LISTADO */}
       <div className="bg-white rounded-xl border">
         <table className="w-full">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
@@ -173,9 +149,7 @@ const ClientModule: React.FC<ClientModuleProps> = ({
                   setClienteActivo(data);
                 }}
               >
-                <td className="px-4 py-3 font-semibold">
-                  {c.nombre_completo}
-                </td>
+                <td className="px-4 py-3 font-semibold">{c.nombre_completo}</td>
                 <td className="px-4 py-3">{c.dni}</td>
                 <td className="px-4 py-3">{c.telefono}</td>
                 <td className="px-4 py-3 text-sm text-slate-500">
@@ -190,7 +164,9 @@ const ClientModule: React.FC<ClientModuleProps> = ({
         </table>
       </div>
 
-      {/* MODAL NUEVO CLIENTE */}
+      {/* =============================
+          MODAL NUEVO CLIENTE
+      ============================== */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
           <form
@@ -236,7 +212,9 @@ const ClientModule: React.FC<ClientModuleProps> = ({
         </div>
       )}
 
-      {/* MODAL DETALLE CLIENTE */}
+      {/* =============================
+          MODAL DETALLE CLIENTE
+      ============================== */}
       {clienteActivo && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-3xl space-y-4">
@@ -258,38 +236,34 @@ const ClientModule: React.FC<ClientModuleProps> = ({
                 {clienteActivo.observaciones || 'Sin observaciones'}
               </p>
             </div>
+            {/* ARCHIVOS DEL CLIENTE */}
+            {clienteActivo.archivos && clienteActivo.archivos.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-bold">Archivos</h4>
 
-            {/* ARCHIVOS */}
-            <div className="space-y-2">
-              <h4 className="font-bold">Archivos cargados</h4>
-
-              {!clienteActivo.archivos?.length && (
-                <p className="text-sm text-slate-500">
-                  No hay archivos cargados.
-                </p>
-              )}
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {clienteActivo.archivos?.map(a => (
-                  <a
-                    key={a.id}
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="border rounded-lg p-2 text-center hover:bg-slate-50"
-                  >
-                    <div className="text-xs font-bold">
-                      {a.tipo.replaceAll('_', ' ')}
-                    </div>
-                    <div className="text-[10px] text-emerald-600 mt-1">
-                      Ver archivo
-                    </div>
-                  </a>
-                ))}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {clienteActivo.archivos.map(a => (
+                    <a
+                      key={a.id}
+                      href={`http://127.0.0.1:8000${a.url}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="border rounded-lg p-2 hover:bg-slate-50"
+                    >
+                      <img
+                        src={`http://127.0.0.1:8000${a.url}`}
+                        alt={a.tipo}
+                        className="w-full h-32 object-cover rounded"
+                      />
+                      <div className="text-xs font-semibold text-center mt-1">
+                        {a.tipo.replaceAll('_', ' ')}
+                      </div>
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* SUBIR ARCHIVO */}
             <div className="border-t pt-4 space-y-2">
               <select
                 className="w-full border p-2 rounded"
@@ -305,15 +279,11 @@ const ClientModule: React.FC<ClientModuleProps> = ({
 
               <input
                 type="file"
-                onChange={e =>
-                  setArchivo(e.target.files?.[0] || null)
-                }
+                onChange={e => setArchivo(e.target.files?.[0] || null)}
               />
 
               <div className="flex justify-end gap-2">
-                <button onClick={() => setClienteActivo(null)}>
-                  Cerrar
-                </button>
+                <button onClick={() => setClienteActivo(null)}>Cerrar</button>
                 <button
                   onClick={subirArchivo}
                   className="bg-emerald-600 text-white px-4 py-2 rounded font-bold"

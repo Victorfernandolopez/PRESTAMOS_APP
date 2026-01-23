@@ -7,6 +7,8 @@ import {
   agregarMontoAPI
 } from '../services/loanService';
 
+const API_URL = "http://127.0.0.1:8000";
+
 /* =============================
    PROPS
 ============================= */
@@ -292,7 +294,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
       )}
 
       {/* =============================
-         MODAL ARCHIVOS
+          MODAL ARCHIVOS
       ============================== */}
       {prestamoArchivos && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -305,7 +307,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
               {prestamoArchivos.cliente.archivos?.map(a => (
                 <a
                   key={a.id}
-                  href={a.url}
+                  href={`${API_URL}${a.url}`}
                   target="_blank"
                   rel="noreferrer"
                   className="border rounded-lg p-3 text-center hover:bg-slate-50"
@@ -328,6 +330,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };
