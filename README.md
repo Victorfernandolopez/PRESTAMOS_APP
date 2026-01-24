@@ -204,3 +204,99 @@ Instalador firmado
 Autor
 
 Proyecto desarrollado como aplicación fullstack desktop, integrando backend Python y frontend moderno, con enfoque en arquitectura clara, persistencia local y empaquetado profesional.
+
+Feature: Renovación de préstamos + corrección de KPIs
+Problema real
+
+En la operatoria diaria de préstamos:
+
+El cliente no siempre cancela el total
+
+Paga solo intereses
+
+Se cierra el préstamo actual y se abre uno nuevo
+
+Los KPIs deben reflejar la realidad financiera
+
+El sistema no contemplaba renovaciones, ni el impacto correcto en:
+
+Total prestado
+
+Total cobrado
+
+Por cobrar
+
+Objetivo
+
+Implementar un flujo de renovación realista, sin romper lógica existente:
+
+Cerrar préstamo original
+
+Registrar el cobro de intereses
+
+Crear nuevo préstamo con nuevo plazo
+
+Recalcular KPIs correctamente
+
+Mantener historial y trazabilidad
+
+Decisiones clave de diseño
+
+Backend
+
+Se creó un endpoint específico:
+POST /prestamos/{prestamo_id}/renovar
+
+La renovación:
+
+Cobra solo intereses
+
+Cambia estado a RENOVADO
+
+Ajusta total_a_pagar del préstamo original
+
+Crea un nuevo préstamo
+
+Todo en una sola transacción
+
+KPIs recalculados en base a estado (PENDIENTE, RENOVADO, MOROSO)
+
+Frontend
+
+Modal de renovación independiente
+
+Cliente bloqueado (no editable)
+
+Plazos dinámicos (7 / 14 / 30 días)
+
+Reutilización de lógica de cálculo (no duplicar reglas)
+
+UI refleja inmediatamente los cambios
+
+Problemas reales encontrados (importante)
+
+Diferencias entre backend en desarrollo vs backend compilado
+
+NaN en KPIs por préstamos renovados
+
+Doble conteo de préstamos cerrados
+
+Inconsistencias en cálculo de intereses
+
+Se resolvió:
+
+Centralizando cálculos
+
+Excluyendo préstamos RENOVADO de KPIs activos
+
+Separando capital vs interés
+
+Resultado final
+
+Renovaciones reales
+
+KPIs confiables
+
+Historial claro
+
+Feature lista para producción
