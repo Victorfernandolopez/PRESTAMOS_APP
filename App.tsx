@@ -109,13 +109,13 @@ const App: React.FC = () => {
         // (nunca se descuenta, es el capital total otorgado)
         acc.total_prestado += p.monto_prestado;
 
-        // Total por cobrar: suma de total_a_pagar SOLO de préstamos PENDIENTE
+        // Total por cobrar: suma de totalActualizado SOLO de préstamos PENDIENTE
+        // totalActualizado incluye punitorios diarios si está en mora
         // (NO incluir SI ni RENOVADO)
         if (p.estado_pago === "PENDIENTE") {
-          const totalAPagar = p.total_a_pagar ?? 0;
-          acc.total_por_cobrar += totalAPagar;
+          const { diasAtraso, totalActualizado } = obtenerCalculosPunitorios(p);
+          acc.total_por_cobrar += totalActualizado;  // ← Incluye punitorios dinámicos
           // Contar morosos si está vencido
-          const { diasAtraso } = obtenerCalculosPunitorios(p);
           if (diasAtraso > 0) acc.cantidad_morosos += 1;
         }
 
