@@ -8,15 +8,16 @@ interface DashboardProps {
   prestamos: Prestamo[];
   resumen: ResumenGeneral;
   clientes: Cliente[];
-  oonAdd: (data: {
-  cliente_id: number;
-  monto_prestado: number;
-  total_a_pagar: number;
-  fecha_vencimiento: string;
-  estado_pago: string;
-}) => void;
+  onAdd: (data: {
+    cliente_id: number;
+    monto_prestado: number;
+    total_a_pagar: number;
+    fecha_vencimiento: string;
+    estado_pago: string;
+  }) => void;
 
   onUpdate: (id: number, updates: Partial<Prestamo>) => void;
+  onRefresh: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -24,7 +25,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   resumen,
   clientes,
   onAdd,
-  onUpdate
+  onUpdate,
+  onRefresh
 }) => {
   const [showForm, setShowForm] = useState(false);
 
@@ -47,7 +49,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <SummaryCards resumen={resumen} />
 
-      <LoanTable prestamos={prestamos} onUpdate={onUpdate} />
+      <LoanTable prestamos={prestamos} onUpdate={onUpdate} onRefresh={onRefresh} />
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

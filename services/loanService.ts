@@ -1,4 +1,5 @@
 import { Prestamo, PlazoDias, EstadoPago, Inversor } from '../types';
+import { calcularTotalAPagarNuevo } from '../utils/loanCalculations';
 
 /* ==============================
    CONFIGURACIÓN GENERAL API
@@ -17,6 +18,8 @@ const API_URL = 'http://127.0.0.1:8000';
 /**
  * Intereses por plazo (valores relativos)
  * Ej: 0.20 = 20%
+ * 
+ * ⚠️ DEPRECATED: Usar calcularTotalAPagarNuevo() de utils/loanCalculations.ts
  */
 export const INTERESES = {
   [PlazoDias.SIETE]: 0.20,
@@ -42,8 +45,7 @@ export const calcularPrestamo = (
   plazo: PlazoDias,
   fechaInicio: string
 ): Partial<Prestamo> => {
-  const interes = INTERESES[plazo];
-  const total = monto * (1 + interes);
+  const total = calcularTotalAPagarNuevo(monto, plazo);
 
   const fecha = new Date(fechaInicio);
   fecha.setDate(fecha.getDate() + plazo);
@@ -193,6 +195,29 @@ export async function agregarMontoAPI(
   });
 
   if (!res.ok) throw new Error('Error agregando monto');
+  return res.json();
+}
+
+/**
+ * Renovar un préstamo existente
+ */
+export async function renovarPrestamoAPI(
+  id: number,
+  monto_renovado: number,
+  nuevo_total_a_pagar: number,
+  nueva_fecha_vencimiento: string
+): Promise<Prestamo> {
+  const res = await fetch(`${API_URL}/prestamos/${id}/renovar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      monto_renovado,
+      nuevo_total_a_pagar,
+      nueva_fecha_vencimiento
+    })
+  });
+
+  if (!res.ok) throw new Error('Error renovando préstamo');
   return res.json();
 }
 

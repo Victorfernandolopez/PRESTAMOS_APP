@@ -92,6 +92,12 @@ class CobrarPrestamo(BaseModel):
     monto_cobrado_final: float
 
 
+class RenovarPrestamoIn(BaseModel):
+    monto_renovado: float
+    nuevo_total_a_pagar: float
+    nueva_fecha_vencimiento: date
+
+
 # =========================
 # INVERSORES
 # =========================

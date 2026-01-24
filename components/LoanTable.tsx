@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Prestamo, EstadoPago } from '../types';
+import RenovationModal from './RenovationModal';
 import {
   esMoroso,
   obtenerCalculosPunitorios,
   cobrarPrestamoAPI,
-  agregarMontoAPI
+  agregarMontoAPI,
+  renovarPrestamoAPI
 } from '../services/loanService';
 
 const API_URL = "http://127.0.0.1:8000";
@@ -22,10 +24,15 @@ const API_URL = "http://127.0.0.1:8000";
  * onUpdate:
  *  - Callback hacia App.tsx
  *  - Se usa cuando el backend devuelve un préstamo actualizado
+ * 
+ * onRefresh:
+ *  - Callback para refrescar la lista completa desde el backend
+ *  - Se usa después de una renovación exitosa
  */
 interface LoanTableProps {
   prestamos: Prestamo[];
   onUpdate: (id: number, prestamo: Prestamo) => void;
+  onRefresh: () => void;
 }
 
 /* =============================
@@ -34,7 +41,8 @@ interface LoanTableProps {
 
 const LoanTable: React.FC<LoanTableProps> = ({
   prestamos,
-  onUpdate
+  onUpdate,
+  onRefresh
 }) => {
 
   /* =============================
@@ -47,6 +55,10 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
   // Préstamo seleccionado para agregar monto
   const [prestamoEditar, setPrestamoEditar] =
+    useState<Prestamo | null>(null);
+
+  // Préstamo seleccionado para renovar
+  const [prestamoRenovar, setPrestamoRenovar] =
     useState<Prestamo | null>(null);
 
   // Préstamo seleccionado para ver archivos
@@ -118,6 +130,18 @@ const LoanTable: React.FC<LoanTableProps> = ({
     } catch {
       alert('Error al agregar monto');
     }
+  };
+
+  /**
+   * Callback cuando se completa la renovación
+   */
+  const handleRenovacionExitosa = (nuevoPrestamo: Prestamo) => {
+    // Limpiar modal
+    setPrestamoRenovar(null);
+
+    // Refrescar la lista completa desde el backend
+    // (no asumir valores locales)
+    onRefresh();
   };
 
   /* =============================
@@ -212,6 +236,10 @@ const LoanTable: React.FC<LoanTableProps> = ({
                       <span className="text-emerald-600 font-bold">
                         PAGADO
                       </span>
+                    ) : p.estado_pago === "RENOVADO" ? (
+                      <span className="text-amber-600 font-bold">
+                        RENOVADO
+                      </span>
                     ) : moroso ? (
                       <span className="text-rose-600 font-bold">
                         MOROSO
@@ -225,7 +253,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
                   {/* ACCIONES */}
                   <td className="px-6 py-4 text-center space-y-2">
-                    {p.estado_pago !== EstadoPago.SI && (
+                    {p.estado_pago !== EstadoPago.SI && p.estado_pago !== "RENOVADO" && (
                       <>
                         <button
                           onClick={() =>
@@ -242,7 +270,22 @@ const LoanTable: React.FC<LoanTableProps> = ({
                         >
                           Agregar monto
                         </button>
+
+                        <button
+                          onClick={() => {
+                            setPrestamoRenovar(p);
+                          }}
+                          className="w-full bg-emerald-600 text-white text-xs py-2 rounded-lg font-bold"
+                        >
+                          Renovar
+                        </button>
                       </>
+                    )}
+
+                    {p.estado_pago === "RENOVADO" && (
+                      <span className="text-xs text-slate-500 italic">
+                        Sin acciones
+                      </span>
                     )}
 
                     {p.cliente.archivos?.length > 0 && (
@@ -291,6 +334,17 @@ const LoanTable: React.FC<LoanTableProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* =============================
+         MODAL RENOVACIÓN
+      ============================== */}
+      {prestamoRenovar && (
+        <RenovationModal
+          prestamo={prestamoRenovar}
+          onCancel={() => setPrestamoRenovar(null)}
+          onSuccess={handleRenovacionExitosa}
+        />
       )}
 
       {/* =============================

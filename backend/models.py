@@ -133,6 +133,10 @@ class Prestamo(Base):
     monto_prestado = Column(Float, nullable=False)
     total_a_pagar = Column(Float, nullable=False)
 
+    # Métricas de cobro
+    total_cobrado = Column(Float, nullable=False, default=0.0)
+    por_cobrar = Column(Float, nullable=False, default=0.0)
+
     # Estado del préstamo
     fecha_vencimiento = Column(Date, nullable=False)
     estado_pago = Column(String, nullable=False)

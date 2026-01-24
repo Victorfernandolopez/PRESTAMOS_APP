@@ -105,15 +105,24 @@ const App: React.FC = () => {
   const getResumen = (): ResumenGeneral => {
     return prestamos.reduce(
       (acc, p) => {
-        const { totalActualizado, diasAtraso } =
-          obtenerCalculosPunitorios(p);
+        // Total prestado: suma de monto_prestado de TODOS los préstamos
+        // (nunca se descuenta, es el capital total otorgado)
+        acc.total_prestado += p.monto_prestado;
 
-        if (p.estado_pago !== EstadoPago.SI) {
-          acc.total_prestado += p.monto_prestado;
-          acc.total_por_cobrar += totalActualizado;
+        // Total por cobrar: suma de total_a_pagar SOLO de préstamos PENDIENTE
+        // (NO incluir SI ni RENOVADO)
+        if (p.estado_pago === "PENDIENTE") {
+          const totalAPagar = p.total_a_pagar ?? 0;
+          acc.total_por_cobrar += totalAPagar;
+          // Contar morosos si está vencido
+          const { diasAtraso } = obtenerCalculosPunitorios(p);
           if (diasAtraso > 0) acc.cantidad_morosos += 1;
-        } else {
-          acc.total_recuperado += totalActualizado;
+        }
+
+        // Total cobrado: suma de monto_cobrado_final de préstamos SI o RENOVADO
+        if (p.estado_pago === "SI" || p.estado_pago === "RENOVADO") {
+          const montoCobrado = Number(p.monto_cobrado_final) || 0;
+          acc.total_recuperado += montoCobrado;
         }
 
         return acc;
@@ -122,7 +131,7 @@ const App: React.FC = () => {
         total_prestado: 0,
         total_por_cobrar: 0,
         total_recuperado: 0,
-        cantidad_prestamos: prestamos.length,
+        cantidad_prestamos: prestamos.filter(p => p.estado_pago !== "RENOVADO").length,
         cantidad_morosos: 0
       }
     );
@@ -170,6 +179,7 @@ const App: React.FC = () => {
             clientes={clientes}
             onAdd={addPrestamo}
             onUpdate={updatePrestamo}
+            onRefresh={cargarPrestamos}
           />
         )}
 

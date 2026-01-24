@@ -80,6 +80,10 @@ export interface Prestamo {
   monto_prestado: number;
   total_a_pagar: number;
 
+  // Métricas de cobro desde el backend
+  total_cobrado: number;
+  por_cobrar: number;
+
   fecha_vencimiento: string;
 
   estado_pago: EstadoPago;
