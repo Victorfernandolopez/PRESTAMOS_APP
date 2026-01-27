@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Prestamo, EstadoPago } from '../types';
 import RenovationModal from './RenovationModal';
+import { formatDateISO } from '../utils/date';
 import {
   esMoroso,
   obtenerCalculosPunitorios,
@@ -217,7 +218,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
                   {/* VENCIMIENTO */}
                   <td className="px-6 py-4 text-sm">
-                    {p.fecha_vencimiento}
+                    {formatDateISO(p.fecha_vencimiento)}
                     {diasAtraso > 0 && (
                       <div className="text-rose-600 text-xs font-bold">
                         Atraso {diasAtraso} días
