@@ -8,6 +8,59 @@ Acá NO hay FastAPI ni HTTP, solo base de datos.
 """
 
 # =========================
+# FUNCIONES AUXILIARES (CÁLCULOS)
+# =========================
+
+def deducir_plazo_del_prestamo(prestamo: models.Prestamo) -> int:
+    """
+    Deduce el plazo (en días) de un préstamo existente basándose en 
+    la tasa de interés implícita (diferencia entre total_a_pagar y monto_prestado).
+    
+    Tasas conocidas:
+    - 7 días: 20% (monto * 1.2)
+    - 14 días: 40% (monto * 1.4)
+    - 30 días: 100% (monto * 2.0)
+    
+    @param prestamo: Objeto Prestamo de la BD
+    @return: Plazo en días (7, 14, o 30). Si no coincide, retorna 7 por defecto.
+    """
+    if prestamo.monto_prestado <= 0:
+        return 7  # default
+    
+    # Calcular tasa de interés (como ratio)
+    tasa = (prestamo.total_a_pagar - prestamo.monto_prestado) / prestamo.monto_prestado
+    
+    # Comparar con tolerancia pequeña
+    if abs(tasa - 0.20) < 0.01:
+        return 7
+    elif abs(tasa - 0.40) < 0.01:
+        return 14
+    elif abs(tasa - 1.00) < 0.01:
+        return 30
+    
+    # Si no coincide exactamente, devolver 7 por defecto
+    return 7
+
+
+def calcular_total_nuevo_monto(monto: float, plazo: int) -> float:
+    """
+    Recalcula el total a pagar basándose en el monto y plazo.
+    Usa la misma lógica de tasas que la creación de préstamos.
+    
+    @param monto: Monto base del préstamo
+    @param plazo: Plazo en días (7, 14, 30)
+    @return: Total a pagar (monto * (1 + tasa))
+    """
+    tasas = {
+        7: 0.20,   # 20%
+        14: 0.40,  # 40%
+        30: 1.00   # 100%
+    }
+    
+    tasa = tasas.get(plazo, 0.20)
+    return monto * (1 + tasa)
+
+# =========================
 # CLIENTES
 # =========================
 
@@ -109,6 +162,19 @@ def listar_prestamos(db: Session):
 def agregar_monto(db: Session, prestamo_id: int, monto_extra: float):
     """
     Agrega dinero a un préstamo existente.
+    
+    REGLAS:
+    1. Se suma monto_extra a monto_prestado (capital)
+    2. Se recalcula total_a_pagar con la MISMA tasa de interés del préstamo original
+    3. El plazo NO cambia
+    4. La fecha de vencimiento NO cambia
+    5. Se actualiza por_cobrar como: total_a_pagar - total_cobrado
+    6. NO se modifica estado_pago
+    
+    @param db: Sesión de la BD
+    @param prestamo_id: ID del préstamo a actualizar
+    @param monto_extra: Monto adicional a agregar al capital
+    @return: Préstamo actualizado o None si no existe
     """
     prestamo = (
         db.query(models.Prestamo)
@@ -119,12 +185,23 @@ def agregar_monto(db: Session, prestamo_id: int, monto_extra: float):
     if not prestamo:
         return None
 
-    # Se incrementa capital y total
-    prestamo.monto_prestado += monto_extra
-    prestamo.total_a_pagar += monto_extra
-    # Actualizar por_cobrar restando lo ya cobrado
+    # 1. Deducir el plazo original del préstamo
+    plazo = deducir_plazo_del_prestamo(prestamo)
+    
+    # 2. Sumar monto_extra al capital
+    nuevo_monto_prestado = prestamo.monto_prestado + monto_extra
+    
+    # 3. Recalcular total_a_pagar usando la misma lógica de intereses
+    nuevo_total_a_pagar = calcular_total_nuevo_monto(nuevo_monto_prestado, plazo)
+    
+    # 4. Actualizar el préstamo
+    prestamo.monto_prestado = nuevo_monto_prestado
+    prestamo.total_a_pagar = nuevo_total_a_pagar
+    
+    # 5. Recalcular por_cobrar
     prestamo.por_cobrar = prestamo.total_a_pagar - prestamo.total_cobrado
-
+    
+    # Guardar cambios
     db.commit()
     db.refresh(prestamo)
     return prestamo
