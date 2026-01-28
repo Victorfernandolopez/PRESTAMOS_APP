@@ -4,6 +4,7 @@ import RenovationModal from './RenovationModal';
 import { formatDateISO } from '../utils/date';
 import {
   esMoroso,
+  isPendiente,
   obtenerCalculosPunitorios,
   cobrarPrestamoAPI,
   agregarMontoAPI,
@@ -52,7 +53,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
   // Filtro actual de la tabla
   const [filter, setFilter] =
-    useState<'all' | 'morosos' | 'pagados'>('all');
+    useState<'all' | 'pendientes' | 'morosos' | 'pagados'>('all');
 
   // Préstamo seleccionado para agregar monto
   const [prestamoEditar, setPrestamoEditar] =
@@ -74,6 +75,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
   ============================== */
 
   const filtered = prestamos.filter(p => {
+    if (filter === 'pendientes') return isPendiente(p);
     if (filter === 'morosos') return esMoroso(p);
     if (filter === 'pagados') return p.estado_pago === EstadoPago.SI;
     return true;
@@ -156,7 +158,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
          FILTROS
       ============================== */}
       <div className="flex gap-2">
-        {(['all', 'morosos', 'pagados'] as const).map(f => (
+        {(['all', 'pendientes', 'morosos', 'pagados'] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -166,7 +168,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            {f === 'all' ? 'Todos' : f}
+            {f === 'all' ? 'Todos' : f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
       </div>

@@ -74,6 +74,25 @@ export const esMoroso = (prestamo: Prestamo): boolean => {
 };
 
 /**
+ * Determina si un préstamo está pendiente (sin vencer y sin pagar)
+ * 
+ * Criterios:
+ * - estado_pago === "PENDIENTE"
+ * - fecha_vencimiento >= fecha actual (no vencido)
+ */
+export const isPendiente = (prestamo: Prestamo): boolean => {
+  if ((prestamo.estado_pago as string) !== "PENDIENTE") return false;
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const vencimiento = new Date(prestamo.fecha_vencimiento);
+  vencimiento.setHours(0, 0, 0, 0);
+
+  return vencimiento >= hoy;
+};
+
+/**
  * Calcula punitorios y total actualizado de un préstamo
  */
 export const obtenerCalculosPunitorios = (prestamo: Prestamo) => {
