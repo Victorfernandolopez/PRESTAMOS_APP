@@ -84,6 +84,7 @@ export interface Prestamo {
   total_cobrado: number;
   por_cobrar: number;
 
+  fecha_creacion: string;
   fecha_vencimiento: string;
 
   estado_pago: EstadoPago;

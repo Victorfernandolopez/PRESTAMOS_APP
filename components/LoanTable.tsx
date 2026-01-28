@@ -179,6 +179,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-6 py-4">Cliente</th>
+              <th className="px-6 py-4">Creación</th>
               <th className="px-6 py-4">Monto</th>
               <th className="px-6 py-4">Vencimiento</th>
               <th className="px-6 py-4">Total</th>
@@ -209,6 +210,11 @@ const LoanTable: React.FC<LoanTableProps> = ({
                     <div className="text-xs text-slate-400">
                       {p.cliente.direccion}
                     </div>
+                  </td>
+
+                  {/* CREACIÓN */}
+                  <td className="px-6 py-4 text-sm">
+                    {new Date(p.fecha_creacion).toLocaleDateString('es-AR')}
                   </td>
 
                   {/* MONTO */}

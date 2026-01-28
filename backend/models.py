@@ -9,6 +9,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from backend.database import Base
+from datetime import date
 
 
 """
@@ -138,6 +139,7 @@ class Prestamo(Base):
     por_cobrar = Column(Float, nullable=False, default=0.0)
 
     # Estado del préstamo
+    fecha_creacion = Column(Date, nullable=True, default=date.today)
     fecha_vencimiento = Column(Date, nullable=False)
     estado_pago = Column(String, nullable=False)
     # ej: PENDIENTE, MOROSO, PAGADO

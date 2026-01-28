@@ -72,6 +72,7 @@ class PrestamoCreate(PrestamoBase):
 
 class PrestamoOut(PrestamoBase):
     id: int
+    fecha_creacion: date
     fecha_pago: Optional[date] = None
     monto_cobrado_final: Optional[float] = None
     cliente: ClienteOut
