@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Prestamo } from '../types';
 import { renovarPrestamoAPI } from '../services/loanService';
-import { calcularTotalAPagarNuevo } from '../utils/loanCalculations';
+ 
 
 /* =============================
    PROPS
@@ -50,20 +50,7 @@ const RenovationModal: React.FC<RenovationModalProps> = ({
       currency: 'ARS'
     }).format(val);
 
-  /**
-   * Calcula el total a pagar basado en el monto renovado y plazo.
-   * Usa la misma lógica y tasas que la creación de préstamos nuevos.
-   * 
-   * Tasas de interés:
-   * - 7 días: 20% (monto * 1.2)
-   * - 14 días: 40% (monto * 1.4)
-   * - 30 días: 100% (monto * 2.0)
-   */
-  const calcularTotalAPagar = (): number => {
-    return calcularTotalAPagarNuevo(montoRenovado, plazo);
-  };
-
-  const totalAPagar = calcularTotalAPagar();
+  
 
   /* =============================
      HANDLERS
@@ -84,17 +71,11 @@ const RenovationModal: React.FC<RenovationModalProps> = ({
     setIsLoading(true);
 
     try {
-      // Calcular la nueva fecha de vencimiento
-      const hoy = new Date();
-      const nuevaFecha = new Date(hoy.getTime() + plazo * 24 * 60 * 60 * 1000);
-      const nuevaFechaStr = nuevaFecha.toISOString().split('T')[0];
-
-      // Hacer el POST al backend
+      // Hacer el POST al backend enviando monto y plazo; backend calcula total y vencimiento
       const nuevoPrestamo = await renovarPrestamoAPI(
         prestamo.id,
         montoRenovado,
-        totalAPagar,
-        nuevaFechaStr
+        plazo
       );
 
       // Cerrar modal y refrescar

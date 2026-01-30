@@ -66,8 +66,12 @@ class PrestamoBase(BaseModel):
     estado_pago: str
 
 
-class PrestamoCreate(PrestamoBase):
-    pass
+class PrestamoCreate(BaseModel):
+    cliente_id: int
+    monto_prestado: float
+    plazo: int  # 7, 14 o 30
+    fecha_inicio: Optional[date] = None
+    estado_pago: Optional[str] = 'PENDIENTE'
 
 
 class PrestamoOut(PrestamoBase):
@@ -78,6 +82,9 @@ class PrestamoOut(PrestamoBase):
     cliente: ClienteOut
     dias_atraso: int = 0
     es_moroso: bool = False
+    punitorio_diario: float = 0.0
+    punitorio_total: float = 0.0
+    total_actualizado: float = 0.0
 
     class Config:
         from_attributes = True
@@ -97,8 +104,7 @@ class CobrarPrestamo(BaseModel):
 
 class RenovarPrestamoIn(BaseModel):
     monto_renovado: float
-    nuevo_total_a_pagar: float
-    nueva_fecha_vencimiento: date
+    plazo: int
 
 
 # =========================
@@ -121,6 +127,9 @@ class InversorCreate(InversorBase):
 class InversorOut(InversorBase):
     id: int
     monto_devuelto: Optional[float] = None
+    dias_trabajados: Optional[int] = None
+    ganancia: Optional[float] = None
+    total_a_devolver: Optional[float] = None
 
     class Config:
         from_attributes = True

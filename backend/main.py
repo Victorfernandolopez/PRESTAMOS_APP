@@ -156,19 +156,19 @@ def cobrar_prestamo(prestamo_id: int, data: schemas.CobrarPrestamo, db: Session 
 @app.post("/prestamos/{prestamo_id}/renovar", response_model=schemas.PrestamoOut)
 def renovar_prestamo(prestamo_id: int, data: schemas.RenovarPrestamoIn, db: Session = Depends(get_db)):
     try:
+        # ahora el backend calcula el total y la nueva fecha a partir del plazo
         nuevo_prestamo = crud.renovar_prestamo(
             db,
             prestamo_id,
             data.monto_renovado,
-            data.nuevo_total_a_pagar,
-            data.nueva_fecha_vencimiento
+            data.plazo
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     if not nuevo_prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
-    
+
     return nuevo_prestamo
 
 # =========================

@@ -96,6 +96,9 @@ export interface Prestamo {
   // Campos calculados en backend
   dias_atraso?: number;
   es_moroso?: boolean;
+  punitorio_diario?: number;
+  punitorio_total?: number;
+  total_actualizado?: number;
 }
 
 /* =========================
@@ -134,4 +137,7 @@ export interface Inversor {
   tasa_diaria: number;
 
   estado: EstadoInversor;
+  dias_trabajados?: number;
+  ganancia?: number;
+  total_a_devolver?: number;
 }

@@ -1,5 +1,4 @@
 import { Prestamo, PlazoDias, EstadoPago, Inversor } from '../types';
-import { calcularTotalAPagarNuevo } from '../utils/loanCalculations';
 
 /* ==============================
    CONFIGURACIÓN GENERAL API
@@ -40,23 +39,8 @@ export const TASA_PUNITORIA_DIARIA = 0.05;
  * Calcula los datos de un préstamo antes de enviarlo al backend.
  * ⚠️ No persiste nada, solo devuelve un objeto parcial.
  */
-export const calcularPrestamo = (
-  monto: number,
-  plazo: PlazoDias,
-  fechaInicio: string
-): Partial<Prestamo> => {
-  const total = calcularTotalAPagarNuevo(monto, plazo);
-
-  const fecha = new Date(fechaInicio);
-  fecha.setDate(fecha.getDate() + plazo);
-
-  return {
-    monto_prestado: monto,
-    total_a_pagar: total,
-    fecha_vencimiento: fecha.toISOString().split('T')[0],
-    estado_pago: EstadoPago.NULL
-  };
-};
+// Nota: cálculos financieros (total_a_pagar, vencimiento, punitorios, ganancias)
+// son realizados en el backend. El frontend solo renderiza los valores devueltos.
 
 /**
  * Determina si un préstamo está en mora
@@ -94,15 +78,15 @@ export const obtenerCalculosPunitorios = (prestamo: Prestamo) => {
       totalActualizado: totalEfectivo
     };
   }
-  // Usar `dias_atraso` provisto por el backend (evita cálculos de fechas en frontend)
+  // Usar los campos calculados por el backend
   const diasAtraso = Math.max(0, Number(prestamo.dias_atraso ?? 0));
-
-  const punitorio = prestamo.total_a_pagar * TASA_PUNITORIA_DIARIA * diasAtraso;
+  const punitorio = Number(prestamo.punitorio_total ?? 0);
+  const totalActualizado = Number(prestamo.total_actualizado ?? prestamo.total_a_pagar);
 
   return {
     diasAtraso,
     punitorio,
-    totalActualizado: prestamo.total_a_pagar + punitorio
+    totalActualizado
   };
 };
 
@@ -114,20 +98,15 @@ export const obtenerCalculosPunitorios = (prestamo: Prestamo) => {
  * Calcula ganancia total de un inversor
  */
 export const calcularInversion = (inversor: Inversor) => {
-  const inicio = new Date(inversor.fecha_inicio);
-  const fin = new Date(inversor.fecha_fin);
-
-  const dias = Math.max(
-    0,
-    Math.ceil((fin.getTime() - inicio.getTime()) / 86400000)
-  );
-
-  const ganancia = inversor.monto_invertido * inversor.tasa_diaria * dias;
+  // Usar campos provistos por el backend
+  const dias = Math.max(0, Number(inversor.dias_trabajados ?? 0));
+  const ganancia = Number(inversor.ganancia ?? 0);
+  const totalADevolver = Number(inversor.total_a_devolver ?? (inversor.monto_invertido + ganancia));
 
   return {
     dias,
     ganancia,
-    totalADevolver: inversor.monto_invertido + ganancia
+    totalADevolver
   };
 };
 
@@ -148,7 +127,7 @@ export async function fetchPrestamos(): Promise<Prestamo[]> {
  * Crear un préstamo en backend
  */
 export async function crearPrestamoAPI(
-  data: Omit<Prestamo, 'id'>
+  data: any
 ): Promise<Prestamo> {
   const res = await fetch(`${API_URL}/prestamos`, {
     method: 'POST',
@@ -200,16 +179,14 @@ export async function agregarMontoAPI(
 export async function renovarPrestamoAPI(
   id: number,
   monto_renovado: number,
-  nuevo_total_a_pagar: number,
-  nueva_fecha_vencimiento: string
+  plazo: number
 ): Promise<Prestamo> {
   const res = await fetch(`${API_URL}/prestamos/${id}/renovar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       monto_renovado,
-      nuevo_total_a_pagar,
-      nueva_fecha_vencimiento
+      plazo
     })
   });
 

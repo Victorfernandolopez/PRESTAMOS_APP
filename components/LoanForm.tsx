@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { PlazoDias } from '../types';
-import { calcularPrestamo } from '../services/loanService';
 
 /* =============================
    TIPOS
@@ -72,17 +71,14 @@ const LoanForm: React.FC<LoanFormProps> = ({
     // Validaciones mínimas
     if (!clienteId || monto <= 0) return;
 
-    // Cálculo centralizado (intereses, vencimiento, etc.)
-    const calculado = calcularPrestamo(monto, plazo, fecha);
-
-    // Se envía SOLO lo que el backend espera
+    // Enviar datos mínimos al backend; el backend calculará total y vencimiento
     onAdd({
       cliente_id: clienteId,
       monto_prestado: monto,
-      total_a_pagar: calculado.total_a_pagar!,
-      fecha_vencimiento: calculado.fecha_vencimiento!,
+      plazo: plazo,
+      fecha_inicio: fecha,
       estado_pago: 'PENDIENTE'
-    });
+    } as any);
 
     // Cerrar modal
     onClose();

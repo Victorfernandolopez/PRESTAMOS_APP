@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import date, timedelta
+from math import ceil
 from . import models, schemas
 
 """
@@ -81,6 +82,63 @@ def aplicar_mora(prestamo: models.Prestamo) -> None:
     dias, moroso = calcular_mora(prestamo)
     setattr(prestamo, 'dias_atraso', dias)
     setattr(prestamo, 'es_moroso', moroso)
+
+
+# =========================
+# REGLAS FINANCIERAS (PURE BUSINESS FUNCTIONS)
+# =========================
+
+# Tasa punitoria diaria (5% diario)
+TASA_PUNITORIA_DIARIA = 0.05
+
+
+def calcular_total_a_pagar(monto: float, plazo: int) -> float:
+    """Calcula total a pagar según tasas por plazo (7/14/30)."""
+    tasas = {7: 0.20, 14: 0.40, 30: 1.00}
+    tasa = tasas.get(plazo, 0.20)
+    return monto * (1 + tasa)
+
+
+def calcular_punitorios(prestamo: models.Prestamo) -> tuple[float, float]:
+    """Devuelve (punitorio_diario, punitorio_total) basados en total_a_pagar y dias_atraso."""
+    total_base = getattr(prestamo, 'total_a_pagar', 0.0) or 0.0
+    dias = getattr(prestamo, 'dias_atraso', 0) or 0
+    punitorio_diario = total_base * TASA_PUNITORIA_DIARIA
+    punitorio_total = punitorio_diario * max(0, int(dias))
+    return punitorio_diario, punitorio_total
+
+
+def calcular_total_actualizado(prestamo: models.Prestamo) -> float:
+    """Calcula el total actualizado que debe pagarse considerando punitorios.
+
+    Si el préstamo ya fue cobrado (`estado_pago == 'SI'`) devuelve el
+    `monto_cobrado_final` cuando exista, sino el `total_a_pagar`.
+    """
+    if getattr(prestamo, 'estado_pago', None) == 'SI':
+        return float(getattr(prestamo, 'monto_cobrado_final', prestamo.total_a_pagar) or prestamo.total_a_pagar)
+
+    pun_diario, pun_total = calcular_punitorios(prestamo)
+    return float((getattr(prestamo, 'total_a_pagar', 0.0) or 0.0) + pun_total)
+
+
+def aplicar_finanzas(prestamo: models.Prestamo) -> None:
+    """Adjunta campos financieros calculados al objeto `prestamo`.
+
+    Campos añadidos:
+    - `punitorio_diario`
+    - `punitorio_total`
+    - `total_actualizado`
+    (además de los campos de mora ya añadidos: `dias_atraso`, `es_moroso`)
+    """
+    # Asegurar que dias_atraso y es_moroso estén presentes
+    aplicar_mora(prestamo)
+
+    pun_diario, pun_total = calcular_punitorios(prestamo)
+    total_actualizado = calcular_total_actualizado(prestamo)
+
+    setattr(prestamo, 'punitorio_diario', float(pun_diario))
+    setattr(prestamo, 'punitorio_total', float(pun_total))
+    setattr(prestamo, 'total_actualizado', float(total_actualizado))
 
 
 def calcular_total_nuevo_monto(monto: float, plazo: int) -> float:
@@ -178,7 +236,22 @@ def crear_prestamo(db: Session, data: schemas.PrestamoCreate):
     if not cliente:
         raise ValueError("Cliente no existe")
 
-    prestamo = models.Prestamo(**data.dict())
+    # Calcular total_a_pagar y fecha_vencimiento en el backend
+    monto = data.monto_prestado
+    plazo = getattr(data, 'plazo', 7)
+    fecha_inicio = getattr(data, 'fecha_inicio', None) or date.today()
+
+    total_a_pagar = calcular_total_a_pagar(monto, plazo)
+    fecha_vencimiento = fecha_inicio + timedelta(days=plazo)
+
+    prestamo = models.Prestamo(
+        cliente_id=data.cliente_id,
+        monto_prestado=monto,
+        total_a_pagar=total_a_pagar,
+        fecha_vencimiento=fecha_vencimiento,
+        estado_pago=data.estado_pago or 'PENDIENTE'
+    )
+
     # Inicializar métricas: al crear, no hay nada cobrado
     prestamo.total_cobrado = 0.0
     prestamo.por_cobrar = prestamo.total_a_pagar
@@ -186,8 +259,8 @@ def crear_prestamo(db: Session, data: schemas.PrestamoCreate):
     db.add(prestamo)
     db.commit()
     db.refresh(prestamo)
-    # Adjuntar campos calculados de mora
-    aplicar_mora(prestamo)
+    # Adjuntar campos calculados de mora y financieros
+    aplicar_finanzas(prestamo)
     return prestamo
 
 
@@ -201,9 +274,9 @@ def listar_prestamos(db: Session):
         .all()
     )
 
-    # Adjuntar campos calculados de mora a cada préstamo
+    # Adjuntar campos calculados de mora y financieros a cada préstamo
     for p in prestamos:
-        aplicar_mora(p)
+        aplicar_finanzas(p)
 
     return prestamos
 
@@ -253,7 +326,7 @@ def agregar_monto(db: Session, prestamo_id: int, monto_extra: float):
     # Guardar cambios
     db.commit()
     db.refresh(prestamo)
-    aplicar_mora(prestamo)
+    aplicar_finanzas(prestamo)
     return prestamo
 
 
@@ -282,7 +355,7 @@ def cobrar_prestamo(db: Session, prestamo_id: int, monto_final: float):
 
     db.commit()
     db.refresh(prestamo)
-    aplicar_mora(prestamo)
+    aplicar_finanzas(prestamo)
     return prestamo
 
 
@@ -290,8 +363,7 @@ def renovar_prestamo(
     db: Session,
     prestamo_id: int,
     monto_renovado: float,
-    nuevo_total_a_pagar: float,
-    nueva_fecha_vencimiento: date
+    plazo: int
 ):
     """
     Renueva un préstamo existente.
@@ -334,15 +406,19 @@ def renovar_prestamo(
     prestamo.fecha_pago = date.today()
     prestamo.monto_cobrado_final = intereses
     
+    # Calcular nuevo total y nueva fecha de vencimiento en backend
+    nuevo_total = calcular_total_a_pagar(monto_renovado, plazo)
+    nueva_fecha = date.today() + timedelta(days=plazo)
+
     # Crear nuevo préstamo con capital original
     nuevo_prestamo = models.Prestamo(
         cliente_id=prestamo.cliente_id,
-        monto_prestado=prestamo.monto_prestado,
-        total_a_pagar=nuevo_total_a_pagar,
+        monto_prestado=monto_renovado,
+        total_a_pagar=nuevo_total,
         total_cobrado=0.0,
-        por_cobrar=nuevo_total_a_pagar,
+        por_cobrar=nuevo_total,
         estado_pago="PENDIENTE",
-        fecha_vencimiento=nueva_fecha_vencimiento
+        fecha_vencimiento=nueva_fecha
     )
     
     # Guardar ambos en una sola transacción
@@ -351,8 +427,8 @@ def renovar_prestamo(
     db.refresh(prestamo)
     db.refresh(nuevo_prestamo)
 
-    # Adjuntar campos calculados de mora al préstamo nuevo
-    aplicar_mora(nuevo_prestamo)
+    # Adjuntar campos calculados de mora y financieros al préstamo nuevo
+    aplicar_finanzas(nuevo_prestamo)
 
     return nuevo_prestamo
 
@@ -376,11 +452,29 @@ def listar_inversores(db: Session):
     """
     Lista inversores.
     """
-    return (
+    inversores = (
         db.query(models.Inversor)
         .order_by(models.Inversor.id.desc())
         .all()
     )
+
+    # Adjuntar cálculos financieros para inversores
+    for inv in inversores:
+        # días trabajados
+        inicio = getattr(inv, 'fecha_inicio', None)
+        fin = getattr(inv, 'fecha_fin', None)
+        dias = 0
+        if inicio and fin:
+            dias = max(0, (fin - inicio).days)
+
+        ganancia = (inv.monto_invertido or 0.0) * (inv.tasa_diaria or 0.0) * dias
+        total_a_devolver = (inv.monto_invertido or 0.0) + ganancia
+
+        setattr(inv, 'dias_trabajados', int(dias))
+        setattr(inv, 'ganancia', float(ganancia))
+        setattr(inv, 'total_a_devolver', float(total_a_devolver))
+
+    return inversores
 
 
 def liquidar_inversor(db: Session, inversor_id: int):
@@ -401,4 +495,18 @@ def liquidar_inversor(db: Session, inversor_id: int):
 
     db.commit()
     db.refresh(inversor)
+    # Adjuntar cálculos financieros mínimos
+    inicio = getattr(inversor, 'fecha_inicio', None)
+    fin = getattr(inversor, 'fecha_fin', None)
+    dias = 0
+    if inicio and fin:
+        dias = max(0, (fin - inicio).days)
+
+    ganancia = (inversor.monto_invertido or 0.0) * (inversor.tasa_diaria or 0.0) * dias
+    total_a_devolver = (inversor.monto_invertido or 0.0) + ganancia
+
+    setattr(inversor, 'dias_trabajados', int(dias))
+    setattr(inversor, 'ganancia', float(ganancia))
+    setattr(inversor, 'total_a_devolver', float(total_a_devolver))
+
     return inversor
