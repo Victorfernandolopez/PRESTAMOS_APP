@@ -76,6 +76,8 @@ class PrestamoOut(PrestamoBase):
     fecha_pago: Optional[date] = None
     monto_cobrado_final: Optional[float] = None
     cliente: ClienteOut
+    dias_atraso: int = 0
+    es_moroso: bool = False
 
     class Config:
         from_attributes = True

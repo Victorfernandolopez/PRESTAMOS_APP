@@ -62,15 +62,8 @@ export const calcularPrestamo = (
  * Determina si un préstamo está en mora
  */
 export const esMoroso = (prestamo: Prestamo): boolean => {
-  if (prestamo.estado_pago === EstadoPago.SI) return false;
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const vencimiento = new Date(prestamo.fecha_vencimiento);
-  vencimiento.setHours(0, 0, 0, 0);
-
-  return vencimiento < hoy;
+  // Usar el campo provisto por el backend
+  return Boolean(prestamo.es_moroso);
 };
 
 /**
@@ -81,15 +74,9 @@ export const esMoroso = (prestamo: Prestamo): boolean => {
  * - fecha_vencimiento >= fecha actual (no vencido)
  */
 export const isPendiente = (prestamo: Prestamo): boolean => {
+  // Pendiente si el estado es PENDIENTE y el backend no lo marca como moroso
   if ((prestamo.estado_pago as string) !== "PENDIENTE") return false;
-
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const vencimiento = new Date(prestamo.fecha_vencimiento);
-  vencimiento.setHours(0, 0, 0, 0);
-
-  return vencimiento >= hoy;
+  return !Boolean(prestamo.es_moroso);
 };
 
 /**
@@ -107,20 +94,10 @@ export const obtenerCalculosPunitorios = (prestamo: Prestamo) => {
       totalActualizado: totalEfectivo
     };
   }
+  // Usar `dias_atraso` provisto por el backend (evita cálculos de fechas en frontend)
+  const diasAtraso = Math.max(0, Number(prestamo.dias_atraso ?? 0));
 
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-
-  const vencimiento = new Date(prestamo.fecha_vencimiento);
-  vencimiento.setHours(0, 0, 0, 0);
-
-  const diasAtraso = Math.max(
-    0,
-    Math.floor((hoy.getTime() - vencimiento.getTime()) / 86400000)
-  );
-
-  const punitorio =
-    prestamo.total_a_pagar * TASA_PUNITORIA_DIARIA * diasAtraso;
+  const punitorio = prestamo.total_a_pagar * TASA_PUNITORIA_DIARIA * diasAtraso;
 
   return {
     diasAtraso,

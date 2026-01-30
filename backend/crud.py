@@ -42,6 +42,47 @@ def deducir_plazo_del_prestamo(prestamo: models.Prestamo) -> int:
     return 7
 
 
+def calcular_mora(prestamo: models.Prestamo) -> tuple[int, bool]:
+    """
+    Calcula los días de atraso y si el préstamo es moroso.
+
+    Reglas:
+    - Si el préstamo ya está cobrado (`estado_pago == 'SI'`) => atraso 0, no moroso
+    - Si hoy <= fecha_vencimiento => atraso 0, no moroso
+    - Si hoy > fecha_vencimiento => atraso = (hoy - fecha_vencimiento).days, moroso = True
+    """
+    hoy = date.today()
+
+    # Protecciones
+    if prestamo is None:
+        return 0, False
+
+    # Si ya fue cobrado, no considerarlo moroso
+    if getattr(prestamo, 'estado_pago', None) == 'SI':
+        return 0, False
+
+    venc = getattr(prestamo, 'fecha_vencimiento', None)
+    if venc is None:
+        return 0, False
+
+    if hoy <= venc:
+        return 0, False
+
+    dias = (hoy - venc).days
+    return max(0, dias), True
+
+
+def aplicar_mora(prestamo: models.Prestamo) -> None:
+    """Adjunta atributos `dias_atraso` y `es_moroso` al objeto `prestamo`.
+
+    Esto permite que Pydantic (con `from_attributes = True`) los serialice
+    en la respuesta del API.
+    """
+    dias, moroso = calcular_mora(prestamo)
+    setattr(prestamo, 'dias_atraso', dias)
+    setattr(prestamo, 'es_moroso', moroso)
+
+
 def calcular_total_nuevo_monto(monto: float, plazo: int) -> float:
     """
     Recalcula el total a pagar basándose en el monto y plazo.
@@ -145,6 +186,8 @@ def crear_prestamo(db: Session, data: schemas.PrestamoCreate):
     db.add(prestamo)
     db.commit()
     db.refresh(prestamo)
+    # Adjuntar campos calculados de mora
+    aplicar_mora(prestamo)
     return prestamo
 
 
@@ -152,11 +195,17 @@ def listar_prestamos(db: Session):
     """
     Devuelve todos los préstamos.
     """
-    return (
+    prestamos = (
         db.query(models.Prestamo)
         .order_by(models.Prestamo.id.desc())
         .all()
     )
+
+    # Adjuntar campos calculados de mora a cada préstamo
+    for p in prestamos:
+        aplicar_mora(p)
+
+    return prestamos
 
 
 def agregar_monto(db: Session, prestamo_id: int, monto_extra: float):
@@ -204,6 +253,7 @@ def agregar_monto(db: Session, prestamo_id: int, monto_extra: float):
     # Guardar cambios
     db.commit()
     db.refresh(prestamo)
+    aplicar_mora(prestamo)
     return prestamo
 
 
@@ -232,6 +282,7 @@ def cobrar_prestamo(db: Session, prestamo_id: int, monto_final: float):
 
     db.commit()
     db.refresh(prestamo)
+    aplicar_mora(prestamo)
     return prestamo
 
 
@@ -299,7 +350,10 @@ def renovar_prestamo(
     db.commit()
     db.refresh(prestamo)
     db.refresh(nuevo_prestamo)
-    
+
+    # Adjuntar campos calculados de mora al préstamo nuevo
+    aplicar_mora(nuevo_prestamo)
+
     return nuevo_prestamo
 
 

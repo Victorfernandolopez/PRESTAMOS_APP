@@ -92,6 +92,10 @@ export interface Prestamo {
   // Datos solo cuando está cobrado
   fecha_pago?: string;
   monto_cobrado_final?: number;
+  
+  // Campos calculados en backend
+  dias_atraso?: number;
+  es_moroso?: boolean;
 }
 
 /* =========================
