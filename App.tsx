@@ -32,6 +32,34 @@ const App: React.FC = () => {
   const [inversores, setInversores] = useState<Inversor[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('prestamos');
   
+  // FASE 2: Período seleccionado (mes actual por defecto en YYYY-MM)
+  const [periodoSeleccionado, setPeriodoSeleccionado] = useState<string>(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  });
+  
+
+  /* =============================
+     PERÍODO Y LISTADO DE PERÍODOS
+  ============================== */
+
+  // Obtener todos los períodos únicos disponibles en préstamos
+  const periodosDisponibles = (): string[] => {
+    const periodos = new Set<string>();
+    prestamos.forEach(p => {
+      if (p.periodo_origen) {
+        periodos.add(p.periodo_origen);
+      }
+    });
+    const sorted = Array.from(periodos).sort().reverse(); // Descendente (más recientes primero)
+    return ['ALL', ...sorted]; // 'ALL' al inicio para vista global
+  };
+
+  // Obtener mes actual automáticamente
+  const getMesActual = (): string => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  };
 
   /* =============================
      CARGA DESDE BACKEND
@@ -103,7 +131,12 @@ const App: React.FC = () => {
      RESUMEN
   ============================== */
   const getResumen = (): ResumenGeneral => {
-    return prestamos.reduce(
+    // Filtrar préstamos por período si no es 'ALL'
+    const prestamosFiltrados = periodoSeleccionado === 'ALL'
+      ? prestamos
+      : prestamos.filter(p => p.periodo_origen === periodoSeleccionado);
+
+    return prestamosFiltrados.reduce(
       (acc, p) => {
         // Total prestado: suma de monto_prestado de TODOS los préstamos
         // (nunca se descuenta, es el capital total otorgado)
@@ -131,7 +164,7 @@ const App: React.FC = () => {
         total_prestado: 0,
         total_por_cobrar: 0,
         total_recuperado: 0,
-        cantidad_prestamos: prestamos.filter(p => p.estado_pago !== "RENOVADO").length,
+        cantidad_prestamos: prestamosFiltrados.filter(p => p.estado_pago !== "RENOVADO").length,
         cantidad_morosos: 0
       }
     );
@@ -180,6 +213,9 @@ const App: React.FC = () => {
             onAdd={addPrestamo}
             onUpdate={updatePrestamo}
             onRefresh={cargarPrestamos}
+            periodoSeleccionado={periodoSeleccionado}
+            onPeriodoChange={setPeriodoSeleccionado}
+            periodosDisponibles={periodosDisponibles()}
           />
         )}
 

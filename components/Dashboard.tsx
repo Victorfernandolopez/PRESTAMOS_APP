@@ -18,6 +18,10 @@ interface DashboardProps {
 
   onUpdate: (id: number, updates: Partial<Prestamo>) => void;
   onRefresh: () => void;
+  // FASE 2: Props del período
+  periodoSeleccionado: string;
+  onPeriodoChange: (periodo: string) => void;
+  periodosDisponibles: string[];
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -26,9 +30,17 @@ const Dashboard: React.FC<DashboardProps> = ({
   clientes,
   onAdd,
   onUpdate,
-  onRefresh
+  onRefresh,
+  periodoSeleccionado,
+  onPeriodoChange,
+  periodosDisponibles
 }) => {
   const [showForm, setShowForm] = useState(false);
+
+  // Filtrar préstamos por período seleccionado
+  const prestamosFiltrados = periodoSeleccionado === 'ALL'
+    ? prestamos
+    : prestamos.filter(p => p.periodo_origen === periodoSeleccionado);
 
   return (
     <div className="space-y-8">
@@ -36,7 +48,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Panel de Control</h2>
           <p className="text-slate-500">
-            Bienvenido al administrador privado de préstamos.
+            {periodoSeleccionado === 'ALL'
+              ? 'Vista global de todos los períodos'
+              : `Período: ${periodoSeleccionado}`}
           </p>
         </div>
         <button
@@ -47,9 +61,29 @@ const Dashboard: React.FC<DashboardProps> = ({
         </button>
       </div>
 
+      {/* FASE 2: Selector de período */}
+      <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
+        <p className="text-sm font-semibold text-slate-700 mb-3">Filtrar por período:</p>
+        <div className="flex flex-wrap gap-2">
+          {periodosDisponibles.map(periodo => (
+            <button
+              key={periodo}
+              onClick={() => onPeriodoChange(periodo)}
+              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                periodoSeleccionado === periodo
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
+              }`}
+            >
+              {periodo === 'ALL' ? '📊 Todos los períodos' : periodo}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <SummaryCards resumen={resumen} />
 
-      <LoanTable prestamos={prestamos} onUpdate={onUpdate} onRefresh={onRefresh} />
+      <LoanTable prestamos={prestamosFiltrados} onUpdate={onUpdate} onRefresh={onRefresh} />
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

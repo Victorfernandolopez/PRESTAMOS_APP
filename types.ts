@@ -112,6 +112,10 @@ export interface Prestamo {
   punitorio_diario?: number;
   punitorio_total?: number;
   total_actualizado?: number;
+
+  // FASE 2: Período de origen y tasa de interés
+  periodo_origen?: string;  // Formato YYYY-MM
+  tasa_interes?: number;    // Tasa decimal (ej: 0.20 para 20%)
 }
 
 /* =========================
