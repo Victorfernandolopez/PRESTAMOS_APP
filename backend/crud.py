@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 from math import ceil
+from fastapi import HTTPException
 from . import models, schemas
 
 """
@@ -259,6 +260,9 @@ def crear_prestamo(db: Session, data: schemas.PrestamoCreate):
     """
     Crea un préstamo para un cliente existente.
     """
+    # Validación de negocio: el monto debe ser positivo
+    if getattr(data, 'monto_prestado', 0) is None or data.monto_prestado <= 0:
+        raise HTTPException(status_code=400, detail="El monto del préstamo debe ser mayor a 0.")
     # Verificación mínima de integridad
     cliente = (
         db.query(models.Cliente)
@@ -377,10 +381,17 @@ def cobrar_prestamo(db: Session, prestamo_id: int, monto_final: float):
     if not prestamo:
         return None
 
+    # Validaciones de negocio
+    if monto_final is None or monto_final <= 0:
+        raise HTTPException(status_code=400, detail="El monto cobrado debe ser mayor a 0.")
+
+    if getattr(prestamo, 'estado_pago', None) == 'SI':
+        raise HTTPException(status_code=400, detail="No se puede cobrar un préstamo ya pagado.")
+
     prestamo.estado_pago = "SI"
     prestamo.monto_cobrado_final = monto_final
     prestamo.fecha_pago = date.today()
-    
+
     # Actualizar métricas de cobro
     prestamo.total_cobrado += monto_final
     prestamo.por_cobrar = max(0, prestamo.total_a_pagar - prestamo.total_cobrado)
@@ -426,6 +437,26 @@ def renovar_prestamo(
     
     if not prestamo:
         return None
+    # Validaciones de negocio
+    if monto_renovado is None or monto_renovado <= 0:
+        raise HTTPException(status_code=400, detail="El monto renovado debe ser mayor a 0.")
+
+    if getattr(prestamo, 'estado_pago', None) == 'SI':
+        raise HTTPException(status_code=400, detail="No se puede renovar un préstamo ya pagado.")
+
+    if getattr(prestamo, 'estado_pago', None) == 'RENOVADO':
+        raise HTTPException(status_code=400, detail="No se puede renovar un préstamo ya renovado.")
+
+    # Deuda actual: usar por_cobrar si está disponible, sino calcularla
+    deuda_actual = getattr(prestamo, 'por_cobrar', None)
+    if deuda_actual is None:
+        deuda_actual = (getattr(prestamo, 'total_a_pagar', 0.0) or 0.0) - (getattr(prestamo, 'total_cobrado', 0.0) or 0.0)
+
+    if monto_renovado > deuda_actual:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El monto renovado ({monto_renovado}) no puede ser mayor a la deuda actual ({deuda_actual})."
+        )
     
     # Calcular intereses (solo lo que no es capital)
     intereses = prestamo.total_a_pagar - prestamo.monto_prestado
