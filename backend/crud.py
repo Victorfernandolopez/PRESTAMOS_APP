@@ -84,6 +84,31 @@ def aplicar_mora(prestamo: models.Prestamo) -> None:
     setattr(prestamo, 'es_moroso', moroso)
 
 
+def calcular_estado_prestamo(estado_pago: str, es_moroso: bool) -> str:
+    """
+    Calcula el estado del préstamo basado en reglas de negocio.
+    FUNCIÓN PURA: No accede a BD, solo usa parámetros.
+    
+    Reglas (en orden de evaluación):
+    1. Si estado_pago == 'SI' → PAGADO
+    2. Si estado_pago == 'RENOVADO' → RENOVADO
+    3. Si es_moroso → MOROSO
+    4. En otro caso → PENDIENTE
+    
+    @param estado_pago: Valor del campo estado_pago (SI, NO, RENOVADO, etc.)
+    @param es_moroso: Booleano indicando si el préstamo tiene mora
+    @return: Estado del préstamo (PAGADO, RENOVADO, MOROSO, PENDIENTE)
+    """
+    if estado_pago == 'SI':
+        return 'PAGADO'
+    elif estado_pago == 'RENOVADO':
+        return 'RENOVADO'
+    elif es_moroso:
+        return 'MOROSO'
+    else:
+        return 'PENDIENTE'
+
+
 # =========================
 # REGLAS FINANCIERAS (PURE BUSINESS FUNCTIONS)
 # =========================
@@ -128,6 +153,7 @@ def aplicar_finanzas(prestamo: models.Prestamo) -> None:
     - `punitorio_diario`
     - `punitorio_total`
     - `total_actualizado`
+    - `estado_prestamo` (estado calculado según reglas de negocio)
     (además de los campos de mora ya añadidos: `dias_atraso`, `es_moroso`)
     """
     # Asegurar que dias_atraso y es_moroso estén presentes
@@ -135,10 +161,16 @@ def aplicar_finanzas(prestamo: models.Prestamo) -> None:
 
     pun_diario, pun_total = calcular_punitorios(prestamo)
     total_actualizado = calcular_total_actualizado(prestamo)
+    
+    # Calcular estado del préstamo basado en reglas de negocio
+    estado_pago = getattr(prestamo, 'estado_pago', 'NO')
+    es_moroso = getattr(prestamo, 'es_moroso', False)
+    estado_prestamo = calcular_estado_prestamo(estado_pago, es_moroso)
 
     setattr(prestamo, 'punitorio_diario', float(pun_diario))
     setattr(prestamo, 'punitorio_total', float(pun_total))
     setattr(prestamo, 'total_actualizado', float(total_actualizado))
+    setattr(prestamo, 'estado_prestamo', estado_prestamo)
 
 
 def calcular_total_nuevo_monto(monto: float, plazo: int) -> float:
@@ -196,7 +228,7 @@ def obtener_cliente(db: Session, cliente_id: int):
 # ARCHIVOS CLIENTE
 # =========================
 
-def agregar_archivo_cliente(db: Session, data: schemas.ClienteArchivoCreate):
+def agregar_archivo_cliente(db: Session, data: schemas.ClienteArchivoBase):
     """
     Guarda un archivo asociado a un cliente.
     (la subida física del archivo se hace en main.py)

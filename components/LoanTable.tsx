@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { Prestamo, EstadoPago } from '../types';
+import { Prestamo, EstadoPago, EstadoPrestamo } from '../types';
 import RenovationModal from './RenovationModal';
 import { formatDateISO } from '../utils/date';
 import {
-  esMoroso,
-  isPendiente,
   obtenerCalculosPunitorios,
   cobrarPrestamoAPI,
   agregarMontoAPI,
@@ -75,9 +73,9 @@ const LoanTable: React.FC<LoanTableProps> = ({
   ============================== */
 
   const filtered = prestamos.filter(p => {
-    if (filter === 'pendientes') return isPendiente(p);
-    if (filter === 'morosos') return esMoroso(p);
-    if (filter === 'pagados') return p.estado_pago === EstadoPago.SI;
+    if (filter === 'pendientes') return p.estado_prestamo === EstadoPrestamo.PENDIENTE;
+    if (filter === 'morosos') return p.estado_prestamo === EstadoPrestamo.MOROSO;
+    if (filter === 'pagados') return p.estado_prestamo === EstadoPrestamo.PAGADO;
     return true;
   });
 
@@ -192,7 +190,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
           <tbody className="divide-y">
             {filtered.map(p => {
-              const moroso = esMoroso(p);
+              const estado = p.estado_prestamo;
               const { diasAtraso, totalActualizado } =
                 obtenerCalculosPunitorios(p);
 
@@ -241,15 +239,15 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
                   {/* ESTADO */}
                   <td className="px-6 py-4">
-                    {p.estado_pago === EstadoPago.SI ? (
+                    {estado === EstadoPrestamo.PAGADO ? (
                       <span className="text-emerald-600 font-bold">
                         PAGADO
                       </span>
-                    ) : p.estado_pago === "RENOVADO" ? (
+                    ) : estado === EstadoPrestamo.RENOVADO ? (
                       <span className="text-amber-600 font-bold">
                         RENOVADO
                       </span>
-                    ) : moroso ? (
+                    ) : estado === EstadoPrestamo.MOROSO ? (
                       <span className="text-rose-600 font-bold">
                         MOROSO
                       </span>
@@ -262,7 +260,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
                   {/* ACCIONES */}
                   <td className="px-6 py-4 text-center space-y-2">
-                    {p.estado_pago !== EstadoPago.SI && p.estado_pago !== "RENOVADO" && (
+                    {estado !== EstadoPrestamo.PAGADO && estado !== EstadoPrestamo.RENOVADO && (
                       <>
                         <button
                           onClick={() =>
@@ -291,7 +289,7 @@ const LoanTable: React.FC<LoanTableProps> = ({
                       </>
                     )}
 
-                    {p.estado_pago === "RENOVADO" && (
+                    {(estado === EstadoPrestamo.PAGADO || estado === EstadoPrestamo.RENOVADO) && (
                       <span className="text-xs text-slate-500 italic">
                         Sin acciones
                       </span>

@@ -13,12 +13,22 @@ export enum PlazoDias {
 }
 
 /**
- * Estado de pago de un préstamo
+ * Estado de pago de un préstamo (campo persistido)
  */
 export enum EstadoPago {
   SI = 'SI',
   NO = 'NO',
   NULL = 'NULL'
+}
+
+/**
+ * Estado calculado del préstamo (derivado del backend)
+ */
+export enum EstadoPrestamo {
+  PAGADO = 'PAGADO',
+  MOROSO = 'MOROSO',
+  RENOVADO = 'RENOVADO',
+  PENDIENTE = 'PENDIENTE'
 }
 
 /**
@@ -88,6 +98,9 @@ export interface Prestamo {
   fecha_vencimiento: string;
 
   estado_pago: EstadoPago;
+  
+  // Estado calculado por el backend según reglas de negocio
+  estado_prestamo: EstadoPrestamo;
 
   // Datos solo cuando está cobrado
   fecha_pago?: string;

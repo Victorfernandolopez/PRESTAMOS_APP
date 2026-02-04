@@ -1,4 +1,4 @@
-import { Prestamo, PlazoDias, EstadoPago, Inversor } from '../types';
+import { Prestamo, PlazoDias, EstadoPago, EstadoPrestamo, Inversor } from '../types';
 
 /* ==============================
    CONFIGURACIÓN GENERAL API
@@ -41,27 +41,6 @@ export const TASA_PUNITORIA_DIARIA = 0.05;
  */
 // Nota: cálculos financieros (total_a_pagar, vencimiento, punitorios, ganancias)
 // son realizados en el backend. El frontend solo renderiza los valores devueltos.
-
-/**
- * Determina si un préstamo está en mora
- */
-export const esMoroso = (prestamo: Prestamo): boolean => {
-  // Usar el campo provisto por el backend
-  return Boolean(prestamo.es_moroso);
-};
-
-/**
- * Determina si un préstamo está pendiente (sin vencer y sin pagar)
- * 
- * Criterios:
- * - estado_pago === "PENDIENTE"
- * - fecha_vencimiento >= fecha actual (no vencido)
- */
-export const isPendiente = (prestamo: Prestamo): boolean => {
-  // Pendiente si el estado es PENDIENTE y el backend no lo marca como moroso
-  if ((prestamo.estado_pago as string) !== "PENDIENTE") return false;
-  return !Boolean(prestamo.es_moroso);
-};
 
 /**
  * Calcula punitorios y total actualizado de un préstamo
