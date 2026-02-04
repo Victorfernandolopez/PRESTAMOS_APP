@@ -148,6 +148,10 @@ class Prestamo(Base):
     fecha_pago = Column(Date, nullable=True)
     monto_cobrado_final = Column(Float, nullable=True)
 
+    # Nuevos campos: período y tasa variable
+    periodo_origen = Column(String, nullable=True)  # Formato YYYY-MM
+    tasa_interes = Column(Float, nullable=True)  # Tasa decimal (ej: 0.20 para 20%)
+
     # Relación inversa
     cliente = relationship("Cliente", back_populates="prestamos")
 

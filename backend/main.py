@@ -157,11 +157,13 @@ def cobrar_prestamo(prestamo_id: int, data: schemas.CobrarPrestamo, db: Session 
 def renovar_prestamo(prestamo_id: int, data: schemas.RenovarPrestamoIn, db: Session = Depends(get_db)):
     try:
         # ahora el backend calcula el total y la nueva fecha a partir del plazo
+        # y opcionalmente usa tasa_interes personalizada
         nuevo_prestamo = crud.renovar_prestamo(
             db,
             prestamo_id,
             data.monto_renovado,
-            data.plazo
+            data.plazo,
+            getattr(data, 'tasa_interes', None)
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

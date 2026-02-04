@@ -259,10 +259,23 @@ def listar_archivos_cliente(db: Session, cliente_id: int):
 def crear_prestamo(db: Session, data: schemas.PrestamoCreate):
     """
     Crea un préstamo para un cliente existente.
+    
+    Cambios para soporte de tasas variables:
+    1. Valida que tasa_interes > 0 (si se proporciona)
+    2. Calcula periodo_origen automáticamente (YYYY-MM)
+    3. Calcula total_a_pagar usando tasa_interes si se proporciona,
+       sino usa la tasa por plazo estándar
+    4. Guarda ambos valores en la base de datos
     """
     # Validación de negocio: el monto debe ser positivo
     if getattr(data, 'monto_prestado', 0) is None or data.monto_prestado <= 0:
         raise HTTPException(status_code=400, detail="El monto del préstamo debe ser mayor a 0.")
+    
+    # Validación de tasa_interes si se proporciona
+    tasa_interes = getattr(data, 'tasa_interes', None)
+    if tasa_interes is not None and tasa_interes <= 0:
+        raise HTTPException(status_code=400, detail="La tasa de interés debe ser mayor a 0.")
+    
     # Verificación mínima de integridad
     cliente = (
         db.query(models.Cliente)
@@ -277,15 +290,27 @@ def crear_prestamo(db: Session, data: schemas.PrestamoCreate):
     plazo = getattr(data, 'plazo', 7)
     fecha_inicio = getattr(data, 'fecha_inicio', None) or date.today()
 
-    total_a_pagar = calcular_total_a_pagar(monto, plazo)
+    # Si tasa_interes se proporciona, usarla; si no, usar tasa por plazo
+    if tasa_interes is not None:
+        total_a_pagar = monto * (1 + tasa_interes)
+    else:
+        total_a_pagar = calcular_total_a_pagar(monto, plazo)
+        # Deducir la tasa usada para guardarla
+        tasa_interes = (total_a_pagar - monto) / monto
+
     fecha_vencimiento = fecha_inicio + timedelta(days=plazo)
+    
+    # Calcular periodo_origen (YYYY-MM)
+    periodo_origen = fecha_inicio.strftime("%Y-%m")
 
     prestamo = models.Prestamo(
         cliente_id=data.cliente_id,
         monto_prestado=monto,
         total_a_pagar=total_a_pagar,
         fecha_vencimiento=fecha_vencimiento,
-        estado_pago=data.estado_pago or 'PENDIENTE'
+        estado_pago=data.estado_pago or 'PENDIENTE',
+        periodo_origen=periodo_origen,
+        tasa_interes=tasa_interes
     )
 
     # Inicializar métricas: al crear, no hay nada cobrado
@@ -343,20 +368,26 @@ def agregar_monto(db: Session, prestamo_id: int, monto_extra: float):
     if not prestamo:
         return None
 
-    # 1. Deducir el plazo original del préstamo
-    plazo = deducir_plazo_del_prestamo(prestamo)
+    # 1. Obtener la tasa de interés
+    # Prioritario: usar tasa_interes si está guardada
+    # Si no, deducir del plazo
+    tasa_interes = getattr(prestamo, 'tasa_interes', None)
     
-    # 2. Sumar monto_extra al capital
-    nuevo_monto_prestado = prestamo.monto_prestado + monto_extra
+    if tasa_interes is not None and tasa_interes > 0:
+        # Usar la tasa guardada
+        nuevo_monto_prestado = prestamo.monto_prestado + monto_extra
+        nuevo_total_a_pagar = nuevo_monto_prestado * (1 + tasa_interes)
+    else:
+        # Fallback: deducir plazo y usar tasa por plazo
+        plazo = deducir_plazo_del_prestamo(prestamo)
+        nuevo_monto_prestado = prestamo.monto_prestado + monto_extra
+        nuevo_total_a_pagar = calcular_total_nuevo_monto(nuevo_monto_prestado, plazo)
     
-    # 3. Recalcular total_a_pagar usando la misma lógica de intereses
-    nuevo_total_a_pagar = calcular_total_nuevo_monto(nuevo_monto_prestado, plazo)
-    
-    # 4. Actualizar el préstamo
+    # 2. Actualizar el préstamo
     prestamo.monto_prestado = nuevo_monto_prestado
     prestamo.total_a_pagar = nuevo_total_a_pagar
     
-    # 5. Recalcular por_cobrar
+    # 3. Recalcular por_cobrar
     prestamo.por_cobrar = prestamo.total_a_pagar - prestamo.total_cobrado
     
     # Guardar cambios
@@ -406,7 +437,8 @@ def renovar_prestamo(
     db: Session,
     prestamo_id: int,
     monto_renovado: float,
-    plazo: int
+    plazo: int,
+    tasa_interes: float = None
 ):
     """
     Renueva un préstamo existente.
@@ -425,6 +457,8 @@ def renovar_prestamo(
        - monto_prestado = capital original
        - total_a_pagar = nuevo_total_a_pagar
        - estado_pago = "PENDIENTE"
+       - periodo_origen = mes actual (YYYY-MM)
+       - tasa_interes = tasa ingresada o deducida del plazo
     
     Retorna el nuevo préstamo creado.
     """
@@ -437,9 +471,13 @@ def renovar_prestamo(
     
     if not prestamo:
         return None
+    
     # Validaciones de negocio
     if monto_renovado is None or monto_renovado <= 0:
         raise HTTPException(status_code=400, detail="El monto renovado debe ser mayor a 0.")
+
+    if tasa_interes is not None and tasa_interes <= 0:
+        raise HTTPException(status_code=400, detail="La tasa de interés debe ser mayor a 0.")
 
     if getattr(prestamo, 'estado_pago', None) == 'SI':
         raise HTTPException(status_code=400, detail="No se puede renovar un préstamo ya pagado.")
@@ -470,8 +508,19 @@ def renovar_prestamo(
     prestamo.monto_cobrado_final = intereses
     
     # Calcular nuevo total y nueva fecha de vencimiento en backend
-    nuevo_total = calcular_total_a_pagar(monto_renovado, plazo)
+    # Si tasa_interes se proporciona, usarla; si no, usar tasa por plazo
+    if tasa_interes is not None:
+        nuevo_total = monto_renovado * (1 + tasa_interes)
+    else:
+        nuevo_total = calcular_total_a_pagar(monto_renovado, plazo)
+        # Deducir la tasa usada para guardarla
+        tasa_interes = (nuevo_total - monto_renovado) / monto_renovado
+    
     nueva_fecha = date.today() + timedelta(days=plazo)
+    
+    # Calcular periodo_origen para el nuevo préstamo (mes actual)
+    hoy = date.today()
+    periodo_origen = hoy.strftime("%Y-%m")
 
     # Crear nuevo préstamo con capital original
     nuevo_prestamo = models.Prestamo(
@@ -481,7 +530,9 @@ def renovar_prestamo(
         total_cobrado=0.0,
         por_cobrar=nuevo_total,
         estado_pago="PENDIENTE",
-        fecha_vencimiento=nueva_fecha
+        fecha_vencimiento=nueva_fecha,
+        periodo_origen=periodo_origen,
+        tasa_interes=tasa_interes
     )
     
     # Guardar ambos en una sola transacción

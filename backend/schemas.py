@@ -72,6 +72,7 @@ class PrestamoCreate(BaseModel):
     plazo: int  # 7, 14 o 30
     fecha_inicio: Optional[date] = None
     estado_pago: Optional[str] = 'PENDIENTE'
+    tasa_interes: Optional[float] = None  # Tasa decimal (ej: 0.20 para 20%)
 
 
 class PrestamoOut(PrestamoBase):
@@ -86,6 +87,8 @@ class PrestamoOut(PrestamoBase):
     punitorio_diario: float = 0.0
     punitorio_total: float = 0.0
     total_actualizado: float = 0.0
+    periodo_origen: Optional[str] = None  # Formato YYYY-MM
+    tasa_interes: Optional[float] = None  # Tasa decimal
 
     class Config:
         from_attributes = True
@@ -106,6 +109,7 @@ class CobrarPrestamo(BaseModel):
 class RenovarPrestamoIn(BaseModel):
     monto_renovado: float
     plazo: int
+    tasa_interes: Optional[float] = None  # Tasa decimal (ej: 0.20 para 20%)
 
 
 # =========================
