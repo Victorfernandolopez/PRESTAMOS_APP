@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlazoDias } from '../types';
+// import { PlazoDias } from '../types';
 
 /* =============================
    TIPOS
@@ -27,6 +27,7 @@ interface Cliente {
  */
 interface LoanFormProps {
   clientes: Cliente[];
+  prestamos: any[]; // Prestamos completos para validación de bloqueo
   onAdd: (data: {
     cliente_id: number;
     monto_prestado: number;
@@ -43,6 +44,7 @@ interface LoanFormProps {
 
 const LoanForm: React.FC<LoanFormProps> = ({
   clientes,
+  prestamos,
   onAdd,
   onClose
 }) => {
@@ -53,35 +55,56 @@ const LoanForm: React.FC<LoanFormProps> = ({
   // Monto del préstamo
   const [monto, setMonto] = useState(0);
 
-  // Plazo (7 / 14 / 30 días)
-  const [plazo, setPlazo] = useState<PlazoDias>(PlazoDias.SIETE);
+  // Plazo libre (días)
+  const [plazo, setPlazo] = useState<number>(0);
+
+  // Tasa de interés libre (%)
+  const [tasa, setTasa] = useState<number>(0);
 
   // Fecha de inicio del préstamo
   const [fecha, setFecha] = useState(
     new Date().toISOString().split('T')[0]
   );
 
+  // Verificar si el cliente está bloqueado
+  const [clienteBloqueado, setClienteBloqueado] = useState(false);
+
+  // Estado para mensaje de error backend
+  const [backendError, setBackendError] = useState<string | null>(null);
+
   /* =============================
      SUBMIT
   ============================== */
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validaciones mínimas
+    setBackendError(null);
+    // Validaciones UX
     if (!clienteId || monto <= 0) return;
-
-    // Enviar datos mínimos al backend; el backend calculará total y vencimiento
-    onAdd({
-      cliente_id: clienteId,
-      monto_prestado: monto,
-      plazo: plazo,
-      fecha_inicio: fecha,
-      estado_pago: 'PENDIENTE'
-    } as any);
-
-    // Cerrar modal
-    onClose();
+    if (plazo <= 0) {
+      setBackendError('El plazo debe ser mayor a 0');
+      return;
+    }
+    if (tasa <= 0) {
+      setBackendError('La tasa de interés debe ser mayor a 0');
+      return;
+    }
+    try {
+      await onAdd({
+        cliente_id: clienteId,
+        monto_prestado: monto,
+        plazo: plazo,
+        tasa_interes: tasa / 100, // Enviar como decimal
+        fecha_inicio: fecha,
+        estado_pago: 'PENDIENTE'
+      } as any);
+      // Si no hay error, cerrar modal
+      onClose();
+    } catch (err: any) {
+      // Si el backend devuelve error, mostrar mensaje
+      if (err && err.detail) setBackendError(err.detail);
+      else setBackendError('Cliente BLOCKEADO por falta de pago.');
+    }
   };
 
   /* =============================
@@ -129,25 +152,32 @@ const LoanForm: React.FC<LoanFormProps> = ({
       {/* PLAZO */}
       <div>
         <label className="block text-sm font-medium mb-1">
-          Plazo
+          Plazo (días)
         </label>
-        <select
+        <input
+          required
+          type="number"
+          min={1}
           className="w-full border rounded-lg p-2"
-          value={plazo}
-          onChange={e =>
-            setPlazo(Number(e.target.value) as PlazoDias)
-          }
-        >
-          <option value={PlazoDias.SIETE}>
-            7 días (20%)
-          </option>
-          <option value={PlazoDias.CATORCE}>
-            14 días (40%)
-          </option>
-          <option value={PlazoDias.TREINTA}>
-            30 días (100%)
-          </option>
-        </select>
+          value={plazo || ''}
+          onChange={e => setPlazo(Number(e.target.value))}
+        />
+      </div>
+
+      {/* TASA DE INTERÉS */}
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Tasa de interés (%)
+        </label>
+        <input
+          required
+          type="number"
+          min={0.01}
+          step={0.01}
+          className="w-full border rounded-lg p-2"
+          value={tasa || ''}
+          onChange={e => setTasa(Number(e.target.value))}
+        />
       </div>
 
       {/* FECHA */}
@@ -163,6 +193,20 @@ const LoanForm: React.FC<LoanFormProps> = ({
         />
       </div>
 
+      {/* BLOQUEO UX */}
+      {clienteBloqueado && (
+        <div className="bg-rose-100 border border-rose-400 text-rose-700 rounded-lg p-3 text-sm mb-2">
+          Este cliente tiene un préstamo <b>BLOQUEADO</b> y no puede recibir nuevos préstamos.
+        </div>
+      )}
+
+      {/* ERROR BACKEND */}
+      {backendError && (
+        <div className="bg-rose-100 border border-rose-400 text-rose-700 rounded-lg p-3 text-sm mb-2">
+          {backendError}
+        </div>
+      )}
+
       {/* BOTONES */}
       <div className="flex justify-end gap-3 pt-4 border-t">
         <button type="button" onClick={onClose}>
@@ -171,6 +215,7 @@ const LoanForm: React.FC<LoanFormProps> = ({
         <button
           type="submit"
           className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold"
+          disabled={clienteBloqueado}
         >
           Crear préstamo
         </button>

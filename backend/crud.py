@@ -1,3 +1,4 @@
+
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 from math import ceil
@@ -8,6 +9,21 @@ from . import models, schemas
 crud.py contiene TODA la lógica de acceso a datos.
 Acá NO hay FastAPI ni HTTP, solo base de datos.
 """
+
+# =========================
+# BLOQUEAR PRÉSTAMO
+# =========================
+def bloquear_prestamo(db: Session, prestamo_id: int):
+    prestamo = db.query(models.Prestamo).filter(models.Prestamo.id == prestamo_id).first()
+    if not prestamo:
+        return None
+    if prestamo.estado_pago == "BLOQUEADO":
+        return prestamo  # Ya bloqueado
+    # Cambiar estado a BLOQUEADO
+    prestamo.estado_pago = "BLOQUEADO"
+    db.commit()
+    db.refresh(prestamo)
+    return prestamo
 
 # =========================
 # FUNCIONES AUXILIARES (CÁLCULOS)
@@ -160,14 +176,25 @@ def aplicar_finanzas(prestamo: models.Prestamo) -> None:
     # Asegurar que dias_atraso y es_moroso estén presentes
     aplicar_mora(prestamo)
 
+    # Si el préstamo está BLOQUEADO:
+    # - total_actualizado = total_a_pagar
+    # - punitorios = 0
+    # - estado_prestamo = BLOQUEADO
+    # - es_moroso = False
+    if getattr(prestamo, 'estado_pago', None) == 'BLOQUEADO':
+        setattr(prestamo, 'punitorio_diario', 0.0)
+        setattr(prestamo, 'punitorio_total', 0.0)
+        setattr(prestamo, 'total_actualizado', float(getattr(prestamo, 'total_a_pagar', 0.0)))
+        setattr(prestamo, 'estado_prestamo', 'BLOQUEADO')
+        setattr(prestamo, 'es_moroso', False)
+        setattr(prestamo, 'dias_atraso', 0)
+        return
+    # Si no, calcular normalmente
     pun_diario, pun_total = calcular_punitorios(prestamo)
     total_actualizado = calcular_total_actualizado(prestamo)
-    
-    # Calcular estado del préstamo basado en reglas de negocio
     estado_pago = getattr(prestamo, 'estado_pago', 'NO')
     es_moroso = getattr(prestamo, 'es_moroso', False)
     estado_prestamo = calcular_estado_prestamo(estado_pago, es_moroso)
-
     setattr(prestamo, 'punitorio_diario', float(pun_diario))
     setattr(prestamo, 'punitorio_total', float(pun_total))
     setattr(prestamo, 'total_actualizado', float(total_actualizado))
@@ -285,6 +312,14 @@ def crear_prestamo(db: Session, data: schemas.PrestamoCreate):
     if not cliente:
         raise ValueError("Cliente no existe")
 
+    # Validar si el cliente tiene préstamo BLOQUEADO
+    bloqueado = db.query(models.Prestamo).filter(
+        models.Prestamo.cliente_id == data.cliente_id,
+        models.Prestamo.estado_pago == "BLOQUEADO"
+    ).first()
+    if bloqueado:
+        raise HTTPException(status_code=400, detail="El cliente tiene un préstamo BLOQUEADO y no puede recibir nuevos préstamos.")
+
     # Calcular total_a_pagar y fecha_vencimiento en el backend
     monto = data.monto_prestado
     plazo = getattr(data, 'plazo', 7)
@@ -367,6 +402,8 @@ def agregar_monto(db: Session, prestamo_id: int, monto_extra: float):
 
     if not prestamo:
         return None
+    if getattr(prestamo, 'estado_pago', None) == 'BLOQUEADO':
+        raise HTTPException(status_code=400, detail="Préstamo bloqueado: no se puede modificar")
 
     # 1. Obtener la tasa de interés
     # Prioritario: usar tasa_interes si está guardada
@@ -411,6 +448,8 @@ def cobrar_prestamo(db: Session, prestamo_id: int, monto_final: float):
 
     if not prestamo:
         return None
+    if getattr(prestamo, 'estado_pago', None) == 'BLOQUEADO':
+        raise HTTPException(status_code=400, detail="Préstamo bloqueado: no se puede cobrar")
 
     # Validaciones de negocio
     if monto_final is None or monto_final <= 0:
@@ -471,17 +510,19 @@ def renovar_prestamo(
     
     if not prestamo:
         return None
+    if getattr(prestamo, 'estado_pago', None) == 'BLOQUEADO':
+        raise HTTPException(status_code=400, detail="Préstamo bloqueado: no se puede renovar")
     
     # Validaciones de negocio
     if monto_renovado is None or monto_renovado <= 0:
         raise HTTPException(status_code=400, detail="El monto renovado debe ser mayor a 0.")
-
-    if tasa_interes is not None and tasa_interes <= 0:
-        raise HTTPException(status_code=400, detail="La tasa de interés debe ser mayor a 0.")
+    if plazo is None or plazo <= 0:
+        raise HTTPException(status_code=400, detail="El plazo debe ser mayor a 0.")
+    if tasa_interes is None or tasa_interes <= 0 or tasa_interes > 2.0:
+        raise HTTPException(status_code=400, detail="La tasa de interés debe ser mayor a 0 y razonable (<= 2.0)")
 
     if getattr(prestamo, 'estado_pago', None) == 'SI':
         raise HTTPException(status_code=400, detail="No se puede renovar un préstamo ya pagado.")
-
     if getattr(prestamo, 'estado_pago', None) == 'RENOVADO':
         raise HTTPException(status_code=400, detail="No se puede renovar un préstamo ya renovado.")
 
@@ -489,16 +530,15 @@ def renovar_prestamo(
     deuda_actual = getattr(prestamo, 'por_cobrar', None)
     if deuda_actual is None:
         deuda_actual = (getattr(prestamo, 'total_a_pagar', 0.0) or 0.0) - (getattr(prestamo, 'total_cobrado', 0.0) or 0.0)
-
     if monto_renovado > deuda_actual:
         raise HTTPException(
             status_code=400,
             detail=f"El monto renovado ({monto_renovado}) no puede ser mayor a la deuda actual ({deuda_actual})."
         )
-    
+
     # Calcular intereses (solo lo que no es capital)
     intereses = prestamo.total_a_pagar - prestamo.monto_prestado
-    
+
     # Cerrar préstamo original: cobrar intereses, no capital
     prestamo.total_a_pagar = intereses
     prestamo.total_cobrado = intereses
@@ -506,19 +546,10 @@ def renovar_prestamo(
     prestamo.estado_pago = "RENOVADO"
     prestamo.fecha_pago = date.today()
     prestamo.monto_cobrado_final = intereses
-    
+
     # Calcular nuevo total y nueva fecha de vencimiento en backend
-    # Si tasa_interes se proporciona, usarla; si no, usar tasa por plazo
-    if tasa_interes is not None:
-        nuevo_total = monto_renovado * (1 + tasa_interes)
-    else:
-        nuevo_total = calcular_total_a_pagar(monto_renovado, plazo)
-        # Deducir la tasa usada para guardarla
-        tasa_interes = (nuevo_total - monto_renovado) / monto_renovado
-    
+    nuevo_total = monto_renovado * (1 + tasa_interes)
     nueva_fecha = date.today() + timedelta(days=plazo)
-    
-    # Calcular periodo_origen para el nuevo préstamo (mes actual)
     hoy = date.today()
     periodo_origen = hoy.strftime("%Y-%m")
 
@@ -534,7 +565,7 @@ def renovar_prestamo(
         periodo_origen=periodo_origen,
         tasa_interes=tasa_interes
     )
-    
+
     # Guardar ambos en una sola transacción
     db.add(nuevo_prestamo)
     db.commit()

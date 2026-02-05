@@ -142,7 +142,7 @@ class Prestamo(Base):
     fecha_creacion = Column(Date, nullable=True, default=date.today)
     fecha_vencimiento = Column(Date, nullable=False)
     estado_pago = Column(String, nullable=False)
-    # ej: PENDIENTE, MOROSO, PAGADO
+    # ej: PENDIENTE, MOROSO, PAGADO, BLOQUEADO
 
     # Datos al momento del cobro
     fecha_pago = Column(Date, nullable=True)

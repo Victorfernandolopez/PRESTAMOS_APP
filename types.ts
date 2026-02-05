@@ -18,7 +18,8 @@ export enum PlazoDias {
 export enum EstadoPago {
   SI = 'SI',
   NO = 'NO',
-  NULL = 'NULL'
+  NULL = 'NULL',
+  BLOQUEADO = 'BLOQUEADO'
 }
 
 /**
@@ -28,7 +29,8 @@ export enum EstadoPrestamo {
   PAGADO = 'PAGADO',
   MOROSO = 'MOROSO',
   RENOVADO = 'RENOVADO',
-  PENDIENTE = 'PENDIENTE'
+  PENDIENTE = 'PENDIENTE',
+  BLOQUEADO = 'BLOQUEADO'
 }
 
 /**

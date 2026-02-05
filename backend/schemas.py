@@ -63,7 +63,7 @@ class PrestamoBase(BaseModel):
     monto_prestado: float
     total_a_pagar: float
     fecha_vencimiento: date
-    estado_pago: str
+    estado_pago: str  # Puede ser PENDIENTE, SI, RENOVADO, BLOQUEADO
 
 
 class PrestamoCreate(BaseModel):
@@ -71,7 +71,7 @@ class PrestamoCreate(BaseModel):
     monto_prestado: float
     plazo: int  # 7, 14 o 30
     fecha_inicio: Optional[date] = None
-    estado_pago: Optional[str] = 'PENDIENTE'
+    estado_pago: Optional[str] = 'PENDIENTE'  # Puede ser BLOQUEADO solo por backend
     tasa_interes: Optional[float] = None  # Tasa decimal (ej: 0.20 para 20%)
 
 

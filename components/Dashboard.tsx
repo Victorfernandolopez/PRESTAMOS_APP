@@ -95,6 +95,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="p-6">
               <LoanForm
                 clientes={clientes}
+                prestamos={prestamos}
                 onAdd={onAdd}
                 onClose={() => setShowForm(false)}
               />

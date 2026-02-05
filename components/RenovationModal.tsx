@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Prestamo } from '../types';
 import { renovarPrestamoAPI } from '../services/loanService';
  
@@ -31,11 +31,22 @@ const RenovationModal: React.FC<RenovationModalProps> = ({
     prestamo.monto_prestado
   );
 
-  // Plazo seleccionado en días
-  const [plazo, setPlazo] = useState<7 | 14 | 30>(14);
+  // Plazo libre (días)
+  const [plazo, setPlazo] = useState<number>(prestamo.plazo ?? 0);
+
+  // Tasa de interés libre (%)
+  const [tasa, setTasa] = useState<number>(prestamo.tasa_interes ? prestamo.tasa_interes * 100 : 0);
 
   // Loading state para el botón
   const [isLoading, setIsLoading] = useState(false);
+
+  // Cálculo local de total a pagar (preview informativo)
+  const totalAPagar = useMemo(() => {
+    if (montoRenovado > 0 && tasa > 0) {
+      return montoRenovado * (1 + tasa / 100);
+    }
+    return 0;
+  }, [montoRenovado, tasa]);
 
   /* =============================
      HELPERS
@@ -62,23 +73,27 @@ const RenovationModal: React.FC<RenovationModalProps> = ({
       alert('El monto a renovar debe ser mayor a 0');
       return;
     }
-
     if (montoRenovado > prestamo.por_cobrar) {
       alert('El monto a renovar no puede exceder lo pendiente de cobrar');
       return;
     }
-
+    if (plazo <= 0) {
+      alert('El plazo debe ser mayor a 0');
+      return;
+    }
+    if (tasa <= 0) {
+      alert('La tasa de interés debe ser mayor a 0');
+      return;
+    }
     setIsLoading(true);
-
     try {
-      // Hacer el POST al backend enviando monto y plazo; backend calcula total y vencimiento
+      // Hacer el POST al backend enviando monto, plazo y tasa_interes
       const nuevoPrestamo = await renovarPrestamoAPI(
         prestamo.id,
         montoRenovado,
-        plazo
+        plazo,
+        tasa / 100 // Enviar como decimal
       );
-
-      // Cerrar modal y refrescar
       onSuccess(nuevoPrestamo);
     } catch (error) {
       console.error('Error renovando préstamo:', error);
@@ -137,16 +152,30 @@ const RenovationModal: React.FC<RenovationModalProps> = ({
             <label className="block text-sm font-semibold text-slate-700 mb-1">
               Plazo (días)
             </label>
-            <select
+            <input
+              type="number"
               className="w-full border border-slate-300 p-2.5 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-slate-100"
-              value={plazo}
-              onChange={e => setPlazo(Number(e.target.value) as 7 | 14 | 30)}
+              value={plazo || ''}
+              onChange={e => setPlazo(Number(e.target.value))}
+              min={1}
               disabled={isLoading}
-            >
-              <option value={7}>7 días</option>
-              <option value={14}>14 días</option>
-              <option value={30}>30 días</option>
-            </select>
+            />
+          </div>
+
+          {/* Tasa de interés */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              Tasa de interés (%)
+            </label>
+            <input
+              type="number"
+              className="w-full border border-slate-300 p-2.5 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-slate-100"
+              value={tasa || ''}
+              onChange={e => setTasa(Number(e.target.value))}
+              min={0.01}
+              step={0.01}
+              disabled={isLoading}
+            />
           </div>
 
           {/* Total a pagar - Solo lectura */}

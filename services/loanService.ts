@@ -158,14 +158,16 @@ export async function agregarMontoAPI(
 export async function renovarPrestamoAPI(
   id: number,
   monto_renovado: number,
-  plazo: number
+  plazo: number,
+  tasa_interes: number
 ): Promise<Prestamo> {
   const res = await fetch(`${API_URL}/prestamos/${id}/renovar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       monto_renovado,
-      plazo
+      plazo,
+      tasa_interes
     })
   });
 

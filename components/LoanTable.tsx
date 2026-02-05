@@ -68,6 +68,9 @@ const LoanTable: React.FC<LoanTableProps> = ({
   // Monto extra a agregar
   const [montoExtra, setMontoExtra] = useState(0);
 
+  // Estado para confirmar bloqueo
+  const [bloquearConfirm, setBloquearConfirm] = useState<Prestamo | null>(null);
+
   /* =============================
      FILTRO
   ============================== */
@@ -143,6 +146,28 @@ const LoanTable: React.FC<LoanTableProps> = ({
     // Refrescar la lista completa desde el backend
     // (no asumir valores locales)
     onRefresh();
+  };
+
+  /**
+   * Acción para bloquear préstamo
+   */
+  const handleBloquear = async (prestamo: Prestamo) => {
+    try {
+      const res = await fetch(`${API_URL}/prestamos/${prestamo.id}/bloquear`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.detail || 'Error al bloquear el préstamo');
+        return;
+      }
+      const actualizado = await res.json();
+      onUpdate(prestamo.id, actualizado);
+      setBloquearConfirm(null);
+      onRefresh();
+    } catch {
+      alert('Error al bloquear el préstamo');
+    }
   };
 
   /* =============================
@@ -251,6 +276,10 @@ const LoanTable: React.FC<LoanTableProps> = ({
                       <span className="text-rose-600 font-bold">
                         MOROSO
                       </span>
+                    ) : estado === EstadoPrestamo.BLOQUEADO ? (
+                      <span className="text-rose-700 font-bold uppercase">
+                        BLOQUEADO
+                      </span>
                     ) : (
                       <span className="text-blue-600 font-bold">
                         PENDIENTE
@@ -260,7 +289,15 @@ const LoanTable: React.FC<LoanTableProps> = ({
 
                   {/* ACCIONES */}
                   <td className="px-6 py-4 text-center space-y-2">
-                    {estado !== EstadoPrestamo.PAGADO && estado !== EstadoPrestamo.RENOVADO && (
+                    {estado === EstadoPrestamo.BLOQUEADO ? (
+                      <span className="text-xs text-rose-700 font-bold uppercase">
+                        Sin acciones
+                      </span>
+                    ) : estado === EstadoPrestamo.PAGADO || estado === EstadoPrestamo.RENOVADO ? (
+                      <span className="text-xs text-slate-500 italic">
+                        Sin acciones
+                      </span>
+                    ) : (
                       <>
                         <button
                           onClick={() =>
@@ -286,22 +323,14 @@ const LoanTable: React.FC<LoanTableProps> = ({
                         >
                           Renovar
                         </button>
+
+                        <button
+                          onClick={() => setBloquearConfirm(p)}
+                          className="w-full bg-rose-700 text-white text-xs py-2 rounded-lg font-bold"
+                        >
+                          Bloquear
+                        </button>
                       </>
-                    )}
-
-                    {(estado === EstadoPrestamo.PAGADO || estado === EstadoPrestamo.RENOVADO) && (
-                      <span className="text-xs text-slate-500 italic">
-                        Sin acciones
-                      </span>
-                    )}
-
-                    {p.cliente.archivos?.length > 0 && (
-                      <button
-                        onClick={() => setPrestamoArchivos(p)}
-                        className="w-full bg-slate-200 text-xs py-2 rounded-lg font-bold"
-                      >
-                        Ver archivos
-                      </button>
                     )}
                   </td>
                 </tr>
@@ -352,6 +381,36 @@ const LoanTable: React.FC<LoanTableProps> = ({
           onCancel={() => setPrestamoRenovar(null)}
           onSuccess={handleRenovacionExitosa}
         />
+      )}
+
+      {/* =============================
+          MODAL BLOQUEAR
+      ============================== */}
+      {bloquearConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+            <h3 className="font-bold mb-4 text-rose-700">Bloquear préstamo</h3>
+            <p className="mb-4 text-sm text-slate-700">
+              Esta acción es <span className="font-bold text-rose-700">irreversible</span>.<br/>
+              El préstamo se cerrará como <span className="font-bold text-rose-700">incobrable</span>.<br/>
+              ¿Deseas continuar?
+            </p>
+            <div className="flex gap-2">
+              <button
+                className="flex-1 bg-rose-700 text-white py-2 rounded-lg font-bold"
+                onClick={() => handleBloquear(bloquearConfirm)}
+              >
+                Sí, bloquear
+              </button>
+              <button
+                className="flex-1 bg-slate-200 py-2 rounded-lg font-bold"
+                onClick={() => setBloquearConfirm(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* =============================

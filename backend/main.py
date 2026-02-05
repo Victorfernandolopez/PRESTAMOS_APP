@@ -1,3 +1,4 @@
+
 import os
 import shutil
 import sys
@@ -192,6 +193,16 @@ def liquidar_inversor(inversor_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Inversor no encontrado")
     return inversor
 
+# =========================
+# BLOQUEAR PRÉSTAMO
+# =========================
+
+@app.post("/prestamos/{prestamo_id}/bloquear", response_model=schemas.PrestamoOut)
+def bloquear_prestamo(prestamo_id: int, db: Session = Depends(get_db)):
+    prestamo = crud.bloquear_prestamo(db, prestamo_id)
+    if not prestamo:
+        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
+    return prestamo
 # =========================
 # STARTUP
 # =========================
